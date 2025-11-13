@@ -12,6 +12,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🔥 Loading recipes into database...");
 
+  // Check for API key
+  if (!process.env.GEMINI_API_KEY) {
+    console.error("❌ GEMINI_API_KEY not found in environment variables.");
+    console.error("📝 Please create a .env file in the project root with:");
+    console.error("   GEMINI_API_KEY=your_api_key_here");
+    console.error("\n💡 Get your API key from: https://aistudio.google.com/app/apikey");
+    process.exit(1);
+  }
+
   const filePath = path.join(process.cwd(), "recipes.csv");
 
   if (!fs.existsSync(filePath)) {
@@ -25,7 +34,7 @@ async function main() {
 
   console.log(`📦 Found ${rows.length} rows in CSV`);
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
   // NEW EMBEDDING MODEL — CORRECT FOR 2024+
   const embedModel = genAI.getGenerativeModel({
@@ -71,14 +80,31 @@ Instructions: ${recipe.instructions}
       `);
 
       if (i % 50 === 0) {
-        console.log(`Inserted ${i} recipes`);
+        console.log(`✅ Inserted ${i + 1} recipes`);
       }
-    } catch (err) {
-      console.error(`❌ Error row ${i}:`, err);
+    } catch (err: any) {
+      // If it's an API key error, stop immediately
+      if (err?.errorDetails?.[0]?.reason === "API_KEY_INVALID" || err?.message?.includes("API key")) {
+        console.error(`\n❌ API Key Error at row ${i}:`);
+        console.error("   The API key is invalid or expired.");
+        console.error("   Please check your .env file and ensure GEMINI_API_KEY is correct.");
+        console.error("   Get a new key from: https://aistudio.google.com/app/apikey\n");
+        process.exit(1);
+      }
+      
+      // For other errors, log but continue
+      console.error(`❌ Error row ${i}:`, err?.message || err);
+      
+      // If too many consecutive errors, stop
+      if (i > 0 && i % 100 === 0) {
+        const errorCount = i;
+        console.warn(`⚠️  Encountered errors. Continuing... (processed ${errorCount} rows)`);
+      }
     }
   }
 
-  console.log("🎉 Loading complete!");
+  console.log("\n🎉 Loading complete!");
+  console.log(`✅ Successfully processed ${rows.length} recipes`);
   process.exit(0);
 }
 

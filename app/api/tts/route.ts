@@ -7,71 +7,85 @@ export async function POST(req: Request) {
     if (!text) return NextResponse.json({ error: "Text required" }, { status: 400 });
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-tts" });
-
-    // Call the model. The exact SDK shape can vary by version — store result and inspect.
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text }] }],
+    
+    // Try gemini-2.0-flash-exp with TTS capabilities
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-exp"
     });
 
-    // DEBUG: log the full result so you can inspect in server logs (remove in prod)
-    try {
-      console.log("TTS raw result:", JSON.stringify(result, null, 2));
-    } catch (e) {
-      console.log("TTS raw result (non-serializable):", result);
+    // Generate audio content - the model should auto-detect TTS intent
+    const result = await model.generateContent(text);
+
+    // Log the structure for debugging
+    console.log("TTS Result structure:", JSON.stringify(result, null, 2));
+
+    // Try to extract audio from various possible locations
+    const response = result.response;
+    const candidate = response.candidates?.[0];
+    
+    if (!candidate) {
+      console.error("No candidate in response");
+      return NextResponse.json({ error: "No audio generated" }, { status: 500 });
     }
 
-    // Try multiple known locations for audio (safe fallbacks).
-    // Use `as any` because SDK typings might not include these fields.
-    const asAny = result as any;
+    // Check multiple possible locations for audio data
+    let audioBase64: string | null = null;
+    let mimeType = "audio/wav";
 
-    // Common possible locations (try them in order)
-    const audioBase64Candidates = [
-      // Old examples we've used:
-      asAny?.response?.audio,
-      // Sometimes output is in `response.output` or `output` array
-      asAny?.output?.[0]?.content?.find?.((c: any) => c.type === "audio")?.data,
-      asAny?.output?.[0]?.content?.find?.((c: any) => c.type === "audio")?.audio, // variant
-      // Some SDKs include `output[0].mimeType` + `output[0].content[0].text` etc.
-      asAny?.response?.output?.[0]?.content?.[0]?.audio,
-      // Another pattern: `result.output[0].content[0].data` or `result.output_audio`
-      asAny?.output_audio,
-      asAny?.audio, // fallback
-      // If the SDK returned base64 inside `response?.items` or similar:
-      asAny?.response?.items?.find?.((i: any) => i.type === "audio")?.data,
-    ];
+    // Location 1: inlineData in parts
+    const audioPart = candidate.content?.parts?.find((part: any) => part.inlineData);
+    if (audioPart?.inlineData?.data) {
+      audioBase64 = audioPart.inlineData.data;
+      mimeType = audioPart.inlineData.mimeType || "audio/wav";
+    }
 
-    const audioBase64 = audioBase64Candidates.find(Boolean) as string | undefined;
+    // Location 2: Direct audio field
+    if (!audioBase64 && (candidate as any).audio) {
+      audioBase64 = (candidate as any).audio;
+    }
+
+    // Location 3: In response object
+    if (!audioBase64 && (response as any).audio) {
+      audioBase64 = (response as any).audio;
+    }
+
+    // Location 4: modelData or other fields
+    if (!audioBase64 && (result as any).modelData?.audio) {
+      audioBase64 = (result as any).modelData.audio;
+    }
 
     if (!audioBase64) {
-      // If nothing found — return helpful error + the shape (first level) for debugging
-      const preview = {
-        topLevelKeys: Object.keys(asAny || {}),
-        // include small snapshot if serializable
-        sample: (() => {
-          try {
-            const clone = { ...(asAny || {}) };
-            // remove heavy fields
-            if (clone.response && clone.response.output) {
-              clone.response.output = "[OUTPUT PRESENT]";
-            }
-            return clone;
-          } catch {
-            return "not-serializable";
-          }
-        })(),
-      };
-      console.error("TTS: audio not found. Shape preview:", preview);
-      return NextResponse.json(
-        { error: "TTS: audio not found in response", preview },
-        { status: 500 }
-      );
+      // If no audio found, log the full structure
+      console.error("No audio data found. Full result:", {
+        hasResponse: !!result.response,
+        hasCandidates: !!result.response.candidates,
+        candidateKeys: candidate ? Object.keys(candidate) : [],
+        contentKeys: candidate?.content ? Object.keys(candidate.content) : [],
+        partsCount: candidate?.content?.parts?.length || 0,
+        firstPartKeys: candidate?.content?.parts?.[0] ? Object.keys(candidate.content.parts[0]) : []
+      });
+      
+      return NextResponse.json({ 
+        error: "No audio data in response",
+        debug: {
+          hasResponse: !!result.response,
+          hasCandidates: !!result.response.candidates,
+        }
+      }, { status: 500 });
     }
 
-    // Success: return base64 string
-    return NextResponse.json({ audioBase64 });
+    // Return the base64 audio data
+    return NextResponse.json({ 
+      audioBase64,
+      mimeType
+    });
+
   } catch (err: any) {
     console.error("TTS ERROR:", err);
-    return NextResponse.json({ error: "TTS failed", details: String(err) }, { status: 500 });
+    console.error("Error details:", err.message, err.stack);
+    return NextResponse.json({ 
+      error: "TTS failed", 
+      details: err.message || String(err) 
+    }, { status: 500 });
   }
 }
