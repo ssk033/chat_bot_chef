@@ -1,0 +1,39 @@
+// Prisma Client Generator
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+// PostgreSQL Datasource (Neon)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Recipe {
+  id           Int        @id @default(autoincrement())
+  title        String
+  ingredients  String?    // comma separated text
+  instructions String?    // step-by-step
+  prepTime     Int?
+  cookTime     Int?
+  totalTime    Int?
+  cuisine      String?
+  tags         String?
+  url          String?
+  image        String?
+  yield        String?
+  embedding    Embedding? @relation
+  createdAt    DateTime   @default(now())
+}
+
+model Embedding {
+  id        Int      @id @default(autoincrement())
+  recipeId  Int      @unique
+  vector    Unsupported("vector")
+  recipe    Recipe   @relation(fields: [recipeId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("embeddings")
+}
+
