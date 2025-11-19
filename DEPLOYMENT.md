@@ -68,14 +68,44 @@ Ollama cannot run on Vercel serverless functions.
 
 ## Step-by-Step Vercel Setup
 
-### 1. Add Environment Variables
-1. Go to Vercel Dashboard
-2. Select your project
+### 1. Add Environment Variables (REQUIRED)
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+2. Select your project (`chat_bot_chef`)
 3. Go to **Settings** → **Environment Variables**
-4. Add:
-   - `DATABASE_URL` = Your PostgreSQL connection string
-   - `OLLAMA_BASE_URL` = (Optional) Your Ollama service URL
-   - `OLLAMA_MODEL` = (Optional) Model name
+4. Click **Add New**
+5. Add these variables:
+
+#### **DATABASE_URL** (REQUIRED - MUST ADD THIS!)
+- **Key**: `DATABASE_URL`
+- **Value**: Your PostgreSQL connection string
+  ```
+  postgresql://user:password@host:port/database?sslmode=require
+  ```
+- **Environment**: Select **Production**, **Preview**, and **Development** (all three)
+- Click **Save**
+
+**How to get DATABASE_URL:**
+- **Neon (Recommended)**: 
+  1. Go to [Neon Console](https://console.neon.tech)
+  2. Select your project
+  3. Go to **Connection Details**
+  4. Copy the **Connection String**
+  5. It looks like: `postgresql://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require`
+
+- **Other PostgreSQL**:
+  - Format: `postgresql://username:password@host:port/database?sslmode=require`
+  - Replace with your actual credentials
+
+#### **OLLAMA_BASE_URL** (OPTIONAL)
+- **Key**: `OLLAMA_BASE_URL`
+- **Value**: Your Ollama service URL (if using cloud Ollama)
+- **Environment**: All environments
+- **Note**: Leave empty if not using Ollama (fallback will work)
+
+#### **OLLAMA_MODEL** (OPTIONAL)
+- **Key**: `OLLAMA_MODEL`
+- **Value**: `llama3.2:1b` (or your preferred model)
+- **Environment**: All environments
 
 ### 2. Database Setup
 1. Make sure your database has:
