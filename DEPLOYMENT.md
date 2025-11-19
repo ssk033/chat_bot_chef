@@ -117,20 +117,45 @@ Vercel will auto-detect Next.js. No special build settings needed.
 
 ## Troubleshooting
 
-### Build Fails
-- Check environment variables are set
-- Check build logs for specific errors
+### Generic Error: "Sorry, I encountered an error..."
+This usually means one of these issues:
 
-### Database Connection Error
-- Verify `DATABASE_URL` is correct
-- Check database allows connections from Vercel IPs
-- Ensure SSL is enabled
+1. **Database Connection Error**
+   - Check `DATABASE_URL` in Vercel environment variables
+   - Verify database is accessible from Vercel
+   - Check Vercel function logs for specific error
 
-### Embeddings Not Working
-- Model files not available on Vercel
-- Need to use cloud embedding service
+2. **Embedding Model Error** (Most Common on Vercel)
+   - Python inference script won't work on Vercel
+   - Error will show: "Python inference failed" or "Model not found"
+   - **Solution**: Use cloud embedding service (OpenAI, Cohere, etc.)
 
-### Ollama Not Working
-- Ollama can't run on Vercel
-- Use cloud Ollama service or alternative LLM API
+3. **Vector Search Error**
+   - pgvector extension not enabled
+   - Error will show: "operator does not exist" or "vector"
+   - **Solution**: Run `CREATE EXTENSION IF NOT EXISTS vector;` in database
+
+4. **Database Tables Missing**
+   - Error will show: "relation does not exist"
+   - **Solution**: Run `npx prisma migrate deploy` or migrations
+
+### How to Debug:
+1. Go to Vercel Dashboard → Your Project → Deployments
+2. Click on latest deployment → View Function Logs
+3. Look for error messages starting with "❌"
+4. Check the specific error type mentioned above
+
+### Common Vercel-Specific Issues:
+
+**Issue**: Embedding generation fails
+- **Cause**: Python scripts don't work on Vercel
+- **Fix**: Replace `lib/embedding-model.ts` to use cloud API instead
+
+**Issue**: Database connection timeout
+- **Cause**: Database not allowing Vercel IPs
+- **Fix**: Whitelist Vercel IPs or use connection pooling
+
+**Issue**: Function timeout
+- **Cause**: Embedding generation takes too long
+- **Fix**: Use faster embedding service or increase timeout
 

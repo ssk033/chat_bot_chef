@@ -131,16 +131,30 @@ export async function POST(req: Request) {
       console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
     } catch (embedError: any) {
       console.error("❌ Embedding generation failed:", embedError);
+      console.error("Embedding error details:", embedError.message);
+      console.error("Embedding error stack:", embedError.stack);
       
       // Check if it's a model not found error
-      if (embedError.message?.includes("Model not found") || embedError.message?.includes("trained model not found")) {
+      if (embedError.message?.includes("Model not found") || 
+          embedError.message?.includes("trained model not found") ||
+          embedError.message?.includes("models/recipe-embedder")) {
         return NextResponse.json({
           reply: "⚠️ Google Colab trained model not found. Please ensure the model is placed in `models/recipe-embedder/` directory.\n\nThen reload the recipes:\n```bash\nnpm run load\n```"
         }, { status: 500 });
       }
       
+      // Python/script errors
+      if (embedError.message?.includes("Python") || 
+          embedError.message?.includes("inference.py") ||
+          embedError.message?.includes("spawn") ||
+          embedError.message?.includes("ENOENT")) {
+        return NextResponse.json({
+          reply: "⚠️ Embedding model error: Python inference script is not available. This is expected on Vercel as Python is not supported. Please use a cloud embedding service or deploy the model separately."
+        }, { status: 500 });
+      }
+      
       return NextResponse.json({
-        reply: "I couldn't process your query. There might be an issue with the embedding model. Please check that the model is trained and Python is available."
+        reply: `⚠️ Embedding generation failed: ${embedError.message || "Unknown error"}. Please check the embedding model setup.`
       }, { status: 500 });
     }
 
@@ -446,36 +460,74 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
   } catch (error: any) {
     console.error("❌ QUERY ERROR:", error);
     console.error("Error details:", error.message);
+    console.error("Error name:", error.name);
     console.error("Stack:", error.stack);
     
-    // Provide more helpful error messages
-    const isRateLimit = error.status === 429 || 
-                       error.message?.includes("429") ||
-                       error.message?.includes("rate limit") ||
-                       error.message?.includes("Resource exhausted");
+    // Provide more helpful error messages based on error type
+    const errorMessage = error.message || String(error) || "Unknown error";
+    const errorName = error.name || "";
     
-    if (isRateLimit) {
+    // Database connection errors
+    if (errorMessage.includes("Can't reach database server") || 
+        errorMessage.includes("Connection") ||
+        errorMessage.includes("ECONNREFUSED") ||
+        errorMessage.includes("P1001")) {
       return NextResponse.json({
-        reply: "⚠️ Rate limit reached. The API has temporary usage limits. Please wait 30-60 seconds and try again. You can also check your API quota at https://aistudio.google.com/app/apikey"
+        reply: "⚠️ Database connection error. Please check your DATABASE_URL environment variable and ensure your database is accessible."
+      }, { status: 500 });
+    }
+    
+    // Database table/relation errors
+    if (errorMessage.includes("relation") || 
+        errorMessage.includes("does not exist") ||
+        errorMessage.includes("P2021") ||
+        errorMessage.includes("P2001")) {
+      return NextResponse.json({
+        reply: "⚠️ Database tables not found. Please run database migrations:\n\n```bash\nnpx prisma migrate deploy\n```\n\nOr if developing locally:\n```bash\nnpx prisma migrate dev\n```"
+      }, { status: 500 });
+    }
+    
+    // Vector/pgvector errors
+    if (errorMessage.includes("vector") || 
+        errorMessage.includes("pgvector") ||
+        errorMessage.includes("operator does not exist")) {
+      return NextResponse.json({
+        reply: "⚠️ Vector extension error. Please ensure pgvector extension is enabled in your PostgreSQL database:\n\n```sql\nCREATE EXTENSION IF NOT EXISTS vector;\n```"
+      }, { status: 500 });
+    }
+    
+    // Embedding model errors
+    if (errorMessage.includes("Model not found") || 
+        errorMessage.includes("trained model not found") ||
+        errorMessage.includes("inference.py") ||
+        errorMessage.includes("Python")) {
+      return NextResponse.json({
+        reply: "⚠️ Embedding model not available. The trained model files are required for generating embeddings. Please ensure the model is properly set up."
+      }, { status: 500 });
+    }
+    
+    // Rate limit errors
+    if (error.status === 429 || 
+        errorMessage.includes("429") ||
+        errorMessage.includes("rate limit") ||
+        errorMessage.includes("Resource exhausted")) {
+      return NextResponse.json({
+        reply: "⚠️ Rate limit reached. Please wait a moment and try again."
       }, { status: 429 });
     }
     
-    let errorMessage = "Query failed. ";
-    
-    if (error.message?.includes("relation") || error.message?.includes("does not exist")) {
-      errorMessage += "Database tables not found. Run migrations with: npx prisma migrate dev";
-    } else if (error.message?.includes("vector")) {
-      errorMessage += "Vector extension not enabled. Make sure pgvector is installed in your database.";
-    } else if (error.message?.includes("quota")) {
-      errorMessage += "API quota exceeded. Please check your API usage limits.";
-    } else {
-      errorMessage += error.message || "Unknown error occurred";
+    // Prisma errors
+    if (errorName.includes("Prisma") || errorMessage.includes("P")) {
+      return NextResponse.json({
+        reply: `⚠️ Database error: ${errorMessage}. Please check your database connection and schema.`
+      }, { status: 500 });
     }
-
+    
+    // Generic error with more context
     return NextResponse.json(
       { 
         error: errorMessage,
-        reply: "Sorry, I encountered an error processing your request. Please try again with a different query."
+        reply: `Sorry, I encountered an error: ${errorMessage}. Please try again or contact support if the issue persists.`
       },
       { status: 500 }
     );
