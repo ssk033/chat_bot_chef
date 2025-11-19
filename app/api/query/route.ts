@@ -5,6 +5,80 @@ import { generateText, checkOllamaAvailable } from "@/lib/ollama-client";
 
 const prisma = new PrismaClient();
 
+/**
+ * Generate intelligent fallback response when LLM is unavailable
+ */
+function generateIntelligentFallbackResponse(
+  message: string,
+  results: any[],
+  requestedCount: number | null
+): string {
+  const limit = requestedCount && requestedCount > 0 ? requestedCount : Math.min(3, results.length);
+  const finalResults = results.slice(0, limit);
+  
+  // Analyze query intent
+  const lowerMessage = message.toLowerCase();
+  const isAskingForIngredients = /ingredient|what.*in|what.*need|what.*use/i.test(lowerMessage);
+  const isAskingForTime = /time|how long|duration|minutes|hours/i.test(lowerMessage);
+  const isAskingForInstructions = /how.*make|how.*cook|how.*prepare|steps|instructions|recipe/i.test(lowerMessage);
+  
+  let reply = "";
+  
+  if (finalResults.length === 0) {
+    return `I couldn't find any recipes matching "${message}". Try being more specific or using ingredient names.`;
+  }
+  
+  // Build contextual response
+  if (isAskingForIngredients && finalResults[0].ingredients) {
+    reply = `Here are the ingredients for ${finalResults[0].title}:\n\n`;
+    reply += `${finalResults[0].ingredients}\n\n`;
+    if (finalResults.length > 1) {
+      reply += `I also found ${finalResults.length - 1} other similar recipe${finalResults.length > 2 ? 's' : ''} you might like.\n`;
+    }
+  } else if (isAskingForTime && (finalResults[0].prepTime || finalResults[0].cookTime)) {
+    const totalTime = (finalResults[0].prepTime || 0) + (finalResults[0].cookTime || 0);
+    reply = `${finalResults[0].title} takes approximately ${totalTime} minutes`;
+    if (finalResults[0].prepTime && finalResults[0].cookTime) {
+      reply += ` (${finalResults[0].prepTime} minutes prep, ${finalResults[0].cookTime} minutes cooking)`;
+    }
+    reply += `.\n\n`;
+  } else if (isAskingForInstructions && finalResults[0].instructions) {
+    reply = `Here's how to make ${finalResults[0].title}:\n\n`;
+    reply += `${finalResults[0].instructions.slice(0, 500)}${finalResults[0].instructions.length > 500 ? '...' : ''}\n\n`;
+  } else {
+    // General recipe recommendation
+    reply = `I found ${finalResults.length} great recipe${finalResults.length > 1 ? 's' : ''} for you:\n\n`;
+  }
+  
+  // Add recipe details
+  finalResults.forEach((r: any, index: number) => {
+    if (!isAskingForIngredients && !isAskingForInstructions) {
+      reply += `${index + 1}. ${r.title}\n`;
+      
+      const totalTime = (r.prepTime || 0) + (r.cookTime || 0);
+      if (totalTime > 0) {
+        reply += `   Time: ${totalTime} minutes`;
+        if (r.prepTime && r.cookTime) {
+          reply += ` (${r.prepTime} min prep, ${r.cookTime} min cook)`;
+        }
+        reply += `\n`;
+      }
+      
+      if (r.ingredients && !isAskingForIngredients) {
+        const ingredients = r.ingredients.replace(/,/g, ', ').slice(0, 150);
+        reply += `   Ingredients: ${ingredients}${r.ingredients.length > 150 ? '...' : ''}\n`;
+      }
+      
+      if (r.cuisine) {
+        reply += `   Cuisine: ${r.cuisine}\n`;
+      }
+      
+      reply += `\n`;
+    }
+  });
+  
+  return reply.trim();
+}
 
 export async function POST(req: Request) {
   try {
@@ -267,11 +341,17 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
       console.log("✅ Response generated successfully using local LLM");
     } catch (llmError: any) {
       console.error("❌ Local LLM error:", llmError);
+      console.log("⚠️ LLM unavailable. Using intelligent fallback response...");
       
-      // Fallback: Return recipes directly without AI enhancement
-      console.log("⚠️ LLM unavailable. Returning recipes directly without AI enhancement...");
-      
-      // Check if it's a general question for fallback
+      // Intelligent fallback: Generate a helpful response from recipes
+      try {
+        reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
+        console.log("✅ Generated intelligent fallback response");
+      } catch (fallbackError) {
+        // Final fallback: Return recipes directly without AI enhancement
+        console.log("⚠️ Using basic recipe listing fallback...");
+        
+        // Check if it's a general question for fallback
       const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
       
       if (isGeneralQuestionFallback) {
@@ -339,7 +419,7 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
         reply += `\n`;
       });
       
-      reply += `\nNote: The local LLM service is unavailable. These are the raw recipe results. Please ensure Ollama is installed and running for enhanced AI responses.`;
+      reply += `\nNote: Enhanced AI responses are currently unavailable, but I've found these great recipes for you!`;
       
       return NextResponse.json({
         reply,
@@ -351,6 +431,7 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
         })),
         llmUnavailable: true
       });
+      }
     }
 
     return NextResponse.json({
@@ -394,7 +475,7 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
     return NextResponse.json(
       { 
         error: errorMessage,
-        reply: "Sorry, I encountered an error processing your request. Please check that Ollama is running and try again."
+        reply: "Sorry, I encountered an error processing your request. Please try again with a different query."
       },
       { status: 500 }
     );
