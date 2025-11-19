@@ -44,3 +44,8 @@ next-env.d.ts
 
 # trained models (can be large)
 /models/
+
+# large data files
+recipes_data.csv
+*.csv.bak
+checkpoints/
