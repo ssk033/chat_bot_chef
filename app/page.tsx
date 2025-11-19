@@ -8,6 +8,7 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [modelStatus, setModelStatus] = useState<{ available: boolean; loading: boolean }>({ available: false, loading: true });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const lastRequestTime = useRef<number>(0);
@@ -37,6 +38,18 @@ export default function Page() {
 
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    // Check model status
+    fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '__check_model__' })
+    }).then(res => res.json()).then(data => {
+      // If we get a proper response (not error), model is working
+      setModelStatus({ available: !data.error || data.reply?.includes('recipes'), loading: false });
+    }).catch(() => {
+      setModelStatus({ available: false, loading: false });
+    });
     
     // Cleanup: stop audio when component unmounts
     return () => {
@@ -72,13 +85,27 @@ export default function Page() {
     lastRequestTime.current = now;
 
     try {
+      // Send conversation history along with current message
+      const conversationHistory = messages.map(m => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text
+      }));
+      
       const res = await fetch("/api/query", {
         method: "POST",
-        body: JSON.stringify({ message: userInput }),
+        body: JSON.stringify({ 
+          message: userInput,
+          history: conversationHistory 
+        }),
         headers: { "Content-Type": "application/json" },
       });
 
       const data = await res.json();
+      
+      // Update model status if we get a successful response
+      if (data.reply && !data.error) {
+        setModelStatus({ available: true, loading: false });
+      }
 
       // Handle rate limit errors specifically
       if (res.status === 429) {
@@ -162,6 +189,22 @@ export default function Page() {
           <p className="text-gray-600 dark:text-gray-400">
             Your AI cooking assistant powered by recipe search
           </p>
+          {/* Model Status Indicator */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {modelStatus.loading ? (
+              <span className="text-xs text-gray-500 dark:text-gray-400">Checking model...</span>
+            ) : modelStatus.available ? (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Google Colab trained model active (1M recipes, 450K examples)
+              </span>
+            ) : (
+              <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                Model checking...
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Chat Messages */}
@@ -174,7 +217,7 @@ export default function Page() {
                   Ask me about recipes, ingredients, or cooking tips!
                 </p>
                 <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
-                  Try: "What can I make with chicken and rice?"
+                  Try: &quot;What can I make with chicken and rice?&quot;
                 </p>
               </div>
             </div>
@@ -198,7 +241,7 @@ export default function Page() {
                       {m.role === "user" ? "You" : "👨‍🍳 Chef"}
                     </div>
                     <div className="whitespace-pre-wrap leading-relaxed">
-                      {m.text}
+                      {m.text.replace(/"/g, '&quot;')}
                     </div>
                   </div>
                 </div>

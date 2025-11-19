@@ -8,10 +8,19 @@ const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json();
+    const { message, history = [] } = await req.json();
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
+
+    // Handle model status check
+    if (message === '__check_model__') {
+      const { isModelAvailable } = await import('@/lib/embedding-model');
+      return NextResponse.json({ 
+        modelAvailable: isModelAvailable(),
+        reply: isModelAvailable() ? "Model ready" : "Model not found"
+      });
     }
 
     console.log("📝 User query:", message);
@@ -50,9 +59,9 @@ export async function POST(req: Request) {
       console.error("❌ Embedding generation failed:", embedError);
       
       // Check if it's a model not found error
-      if (embedError.message?.includes("Model not found") || embedError.message?.includes("train the model")) {
+      if (embedError.message?.includes("Model not found") || embedError.message?.includes("trained model not found")) {
         return NextResponse.json({
-          reply: "⚠️ Custom embedding model not found. Please train the model first:\n\n```bash\npython scripts/train_model.py\n```\n\nThen reload the recipes:\n```bash\nnpx ts-node scripts/load.ts\n```"
+          reply: "⚠️ Google Colab trained model not found. Please ensure the model is placed in `models/recipe-embedder/` directory.\n\nThen reload the recipes:\n```bash\nnpm run load\n```"
         }, { status: 500 });
       }
       
@@ -81,20 +90,16 @@ export async function POST(req: Request) {
       // If vector search fails, try a simple text search as fallback
       console.log("🔄 Falling back to text search...");
       try {
-        const searchTerms = message.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+        const searchTerms = message.toLowerCase().split(/\s+/).filter((term: string) => term.length > 2);
         
         if (searchTerms.length > 0) {
           // Use Prisma's OR query for text search
-          const searchConditions = searchTerms.map(term => ({
-            OR: [
-              { title: { contains: term, mode: 'insensitive' as const } },
-              { ingredients: { contains: term, mode: 'insensitive' as const } }
-            ]
-          }));
-          
           const textResults = await prisma.recipe.findMany({
             where: {
-              OR: searchConditions.flatMap(c => c.OR)
+              OR: searchTerms.flatMap((term: string) => [
+                { title: { contains: term, mode: 'insensitive' as const } },
+                { ingredients: { contains: term, mode: 'insensitive' as const } }
+              ])
             },
             take: 5
           });
@@ -113,6 +118,61 @@ export async function POST(req: Request) {
     }
 
     console.log("✅ Found", results.length, "matching recipes");
+
+    // Check if this is a general question (not recipe-related)
+    const isGeneralQuestion = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim()) ||
+                               message.trim().length < 10 ||
+                               (!message.toLowerCase().match(/\b(recipe|ingredient|food|dish|cook|bake|make|prepare|cuisine|meal|breakfast|lunch|dinner|snack|dessert|appetizer|chicken|beef|pork|fish|vegetable|pasta|rice|bread|soup|salad|pizza|burger|sandwich|cake|cookie|pie|sauce|spice|herb|flavor|taste|kitchen|cooking|baking|grill|fry|boil|steam|roast)\b/i) && results.length === 0);
+
+    // If it's a general question, skip recipe search and go directly to LLM
+    if (isGeneralQuestion && results.length === 0) {
+      console.log("💬 Detected general question, skipping recipe search");
+      
+      // Build conversation history for context
+      let conversationContext = "";
+      if (history.length > 0) {
+        conversationContext = "\n\nPrevious conversation:\n";
+        history.slice(-5).forEach((msg: any) => {
+          conversationContext += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`;
+        });
+      }
+      
+      const generalPrompt = `You are a friendly and helpful AI chef assistant. You can help with cooking questions, recipe suggestions, and general conversation.
+
+User: ${message}${conversationContext}
+
+Provide a friendly, helpful response. If the user is greeting you, greet them back warmly. If they're asking for help, offer assistance. Keep responses concise and natural. Use plain text only (no markdown formatting).`;
+
+      try {
+        const ollamaAvailable = await checkOllamaAvailable();
+        if (!ollamaAvailable) {
+          return NextResponse.json({
+            reply: "Hello! I'm your AI chef assistant. I can help you find recipes and answer cooking questions. However, I need Ollama to be running for full functionality. Please install Ollama from https://ollama.ai"
+          });
+        }
+
+        const reply = await generateText(generalPrompt);
+        return NextResponse.json({ reply });
+      } catch (error: any) {
+        // Fallback response for general questions
+        const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
+        const responses: { [key: string]: string } = {
+          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
+          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
+          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
+          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
+          "thank you": "You're very welcome! Happy cooking!",
+          "bye": "Goodbye! Happy cooking!",
+          "goodbye": "See you later! Enjoy your cooking!",
+          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+        };
+        
+        const lowerMessage = message.toLowerCase().trim();
+        const reply = responses[lowerMessage] || greetings[Math.floor(Math.random() * greetings.length)] + " I'm your AI chef assistant. How can I help you with recipes?";
+        
+        return NextResponse.json({ reply });
+      }
+    }
 
     if (results.length === 0) {
       return NextResponse.json({
@@ -157,21 +217,33 @@ Cuisine: ${r.cuisine || "Not specified"}
     // 3️⃣ Ask local LLM (Ollama) to answer based on DB context
     const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
     
+    // Build conversation history for context
+    let conversationContext = "";
+    if (history.length > 0) {
+      conversationContext = "\n\nPrevious conversation context:\n";
+      history.slice(-5).forEach((msg: any) => {
+        conversationContext += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`;
+      });
+      conversationContext += "\nUse the conversation history to understand context and provide relevant responses.\n";
+    }
+    
     const prompt = `
 You are a professional chef AI assistant.
 
-User query: "${message}"
+Current user query: "${message}"
 ${countInstruction}
+${conversationContext}
 
 Here are the most relevant recipes from the database:
 ${context}
 
-Based on these recipes, provide a helpful response that:
-- Answers the user's query directly
+Based on these recipes and the conversation history, provide a helpful response that:
+- Answers the user's query directly, considering any previous context
 - ${requestedCount ? `Provides exactly ${requestedCount} recipe${requestedCount > 1 ? 's' : ''} as requested` : 'Recommends the best matching recipe(s)'}
 - Explains why they fit the user's needs
 - Provides clear step-by-step instructions
 - Suggests alternatives if relevant
+- References previous conversation if relevant (e.g., "as you mentioned earlier", "like we discussed")
 
 IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special characters that would be read aloud by text-to-speech. Use plain text only. Format your response naturally for both reading and listening.
 `;
@@ -198,6 +270,27 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
       
       // Fallback: Return recipes directly without AI enhancement
       console.log("⚠️ LLM unavailable. Returning recipes directly without AI enhancement...");
+      
+      // Check if it's a general question for fallback
+      const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
+      
+      if (isGeneralQuestionFallback) {
+        const responses: { [key: string]: string } = {
+          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
+          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
+          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
+          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
+          "thank you": "You're very welcome! Happy cooking!",
+          "bye": "Goodbye! Happy cooking!",
+          "goodbye": "See you later! Enjoy your cooking!",
+          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+        };
+        
+        const lowerMessage = message.toLowerCase().trim();
+        const reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
+        
+        return NextResponse.json({ reply, llmUnavailable: true });
+      }
       
       // Extract number from query (e.g., "3 recipes" -> 3)
       const numberMatch = message.match(/\b(\d+)\s*(?:recipe|recipes|dish|dishes)?\b/i);

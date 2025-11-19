@@ -25,8 +25,8 @@ export function isModelAvailable(): boolean {
 export async function generateEmbedding(text: string): Promise<number[]> {
   if (!isModelAvailable()) {
     throw new Error(
-      `Custom model not found. Please train the model first:\n` +
-      `  python scripts/train_model.py`
+      `Google Colab trained model not found at ${MODEL_DIR}.\n` +
+      `Please ensure the trained model is placed in models/recipe-embedder/`
     );
   }
 

@@ -21,7 +21,7 @@ def load_model():
     global _model
     if _model is None:
         if not MODEL_DIR.exists():
-            print(json.dumps({"error": f"Model not found at {MODEL_DIR}. Please train the model first."}))
+            print(json.dumps({"error": f"Google Colab trained model not found at {MODEL_DIR}. Please ensure the model is placed in models/recipe-embedder/"}))
             sys.exit(1)
         
         try:

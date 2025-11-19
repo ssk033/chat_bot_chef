@@ -8,8 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "train": "python3 scripts/train_model.py",
-    "load": "npx tsx scripts/load.ts"
+    "load": "npx tsx scripts/load.ts",
+    "check-db": "npx tsx scripts/check-db.ts",
+    "clear-db": "npx tsx scripts/clear-db.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
