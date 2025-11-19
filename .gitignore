@@ -49,3 +49,7 @@ next-env.d.ts
 recipes_data.csv
 *.csv.bak
 checkpoints/
+
+# deployment docs (keep local, don't push)
+DEPLOYMENT.md
+VERCEL_SETUP.md
