@@ -1,54 +1,10 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateEmbedding } from "@/lib/embedding-model";
+import { generateText, checkOllamaAvailable } from "@/lib/ollama-client";
 
 const prisma = new PrismaClient();
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Embedding model
-const embedModel = genAI.getGenerativeModel({
-  model: "models/text-embedding-004",
-});
-
-// Chat model
-const chatModel = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
-});
-
-// Helper function to retry with exponential backoff
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 1000
-): Promise<T> {
-  let lastError: any;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error: any) {
-      lastError = error;
-      
-      // Check if it's a rate limit error (429)
-      const isRateLimit = error.status === 429 || 
-                         error.message?.includes("429") ||
-                         error.message?.includes("rate limit") ||
-                         error.message?.includes("Resource exhausted");
-      
-      if (isRateLimit && attempt < maxRetries - 1) {
-        const delay = baseDelay * Math.pow(2, attempt);
-        console.log(`⏳ Rate limited. Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      
-      // If not rate limit or last attempt, throw
-      throw error;
-    }
-  }
-  
-  throw lastError;
-}
 
 export async function POST(req: Request) {
   try {
@@ -80,27 +36,28 @@ export async function POST(req: Request) {
       });
     }
 
-    // 1️⃣ Create embedding for user query
-    console.log("🔄 Generating embedding for query...");
+    // 1️⃣ Create embedding for user query using CUSTOM trained model
+    console.log("🔄 Generating embedding for query using custom model...");
     let qEmbedding: number[];
     let qLiteral: string;
     
     try {
-      const embedRes = await retryWithBackoff(() => embedModel.embedContent(message));
-      qEmbedding = embedRes.embedding.values;
+      // Use custom trained embedding model instead of Google API
+      qEmbedding = await generateEmbedding(message);
       qLiteral = `[${qEmbedding.join(",")}]`;
+      console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
     } catch (embedError: any) {
       console.error("❌ Embedding generation failed:", embedError);
-      const isRateLimit = embedError.status === 429 || embedError.message?.includes("429");
       
-      if (isRateLimit) {
+      // Check if it's a model not found error
+      if (embedError.message?.includes("Model not found") || embedError.message?.includes("train the model")) {
         return NextResponse.json({
-          reply: "⚠️ Rate limit reached for the embedding service. Please wait a few moments and try again. The API has temporary usage limits to ensure fair access for all users."
-        }, { status: 429 });
+          reply: "⚠️ Custom embedding model not found. Please train the model first:\n\n```bash\npython scripts/train_model.py\n```\n\nThen reload the recipes:\n```bash\nnpx ts-node scripts/load.ts\n```"
+        }, { status: 500 });
       }
       
       return NextResponse.json({
-        reply: "I couldn't process your query. There might be an issue with the embedding service. Please try again or check your API key configuration."
+        reply: "I couldn't process your query. There might be an issue with the embedding model. Please check that the model is trained and Python is available."
       }, { status: 500 });
     }
 
@@ -197,7 +154,7 @@ Cuisine: ${r.cuisine || "Not specified"}
 `;
     }
 
-    // 3️⃣ Ask Gemini to answer based on DB context
+    // 3️⃣ Ask local LLM (Ollama) to answer based on DB context
     const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
     
     const prompt = `
@@ -219,87 +176,88 @@ Based on these recipes, provide a helpful response that:
 IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special characters that would be read aloud by text-to-speech. Use plain text only. Format your response naturally for both reading and listening.
 `;
 
-    console.log("🤖 Asking Gemini for response...");
+    console.log("🤖 Asking local LLM (Ollama) for response...");
     let reply: string;
     
     try {
-      const completion = await retryWithBackoff(() => chatModel.generateContent(prompt));
-      reply = completion.response.text();
-      console.log("✅ Response generated successfully");
-    } catch (geminiError: any) {
-      console.error("❌ Gemini API error:", geminiError);
-      
-      const isRateLimit = geminiError.status === 429 || 
-                         geminiError.message?.includes("429") ||
-                         geminiError.message?.includes("Resource exhausted");
-      
-      if (isRateLimit) {
-        // Fallback: Return recipes directly without AI enhancement
-        console.log("⚠️ Rate limited. Returning recipes directly without AI enhancement...");
-        
-        // Extract number from query (e.g., "3 recipes" -> 3)
-        const numberMatch = message.match(/\b(\d+)\s*(?:recipe|recipes|dish|dishes)?\b/i);
-        const requestedCount = numberMatch ? parseInt(numberMatch[1], 10) : null;
-        
-        // Deduplicate results by title (case-insensitive)
-        const seenTitles = new Set<string>();
-        const uniqueResults = results.filter((r: any) => {
-          const titleLower = r.title?.toLowerCase().trim();
-          if (!titleLower || seenTitles.has(titleLower)) {
-            return false;
-          }
-          seenTitles.add(titleLower);
-          return true;
-        });
-        
-        // Limit to requested number or default to 3
-        const limit = requestedCount && requestedCount > 0 ? requestedCount : 3;
-        const finalResults = uniqueResults.slice(0, limit);
-        
-        // Format response without markdown (TTS-friendly)
-        reply = `I found ${finalResults.length} recipe${finalResults.length > 1 ? 's' : ''} matching your query:\n\n`;
-        
-        finalResults.forEach((r: any, index: number) => {
-          reply += `Recipe ${index + 1}: ${r.title}\n`;
-          
-          const totalTime = (r.prepTime || 0) + (r.cookTime || 0);
-          if (totalTime > 0) {
-            reply += `Total time: ${totalTime} minutes`;
-            if (r.prepTime && r.cookTime) {
-              reply += ` (${r.prepTime} minutes prep, ${r.cookTime} minutes cook)`;
-            }
-            reply += `\n`;
-          }
-          
-          if (r.ingredients) {
-            const ingredients = r.ingredients.replace(/,/g, ', ').slice(0, 200);
-            reply += `Ingredients: ${ingredients}${r.ingredients.length > 200 ? '...' : ''}\n`;
-          }
-          
-          if (r.instructions) {
-            const instructions = r.instructions.slice(0, 250).replace(/\n/g, ' ');
-            reply += `Instructions: ${instructions}${r.instructions.length > 250 ? '...' : ''}\n`;
-          }
-          
-          reply += `\n`;
-        });
-        
-        reply += `\nNote: The AI response service is currently rate-limited. These are the raw recipe results. Please try again in a moment for an enhanced AI-powered response.`;
-        
-        return NextResponse.json({
-          reply,
-          sources: finalResults.map((r: any) => ({
-            title: r.title,
-            prepTime: r.prepTime,
-            cookTime: r.cookTime,
-            distance: r.distance
-          })),
-          rateLimited: true
-        });
+      // Check if Ollama is available
+      const ollamaAvailable = await checkOllamaAvailable();
+      if (!ollamaAvailable) {
+        throw new Error(
+          "Ollama is not running. Please install and start Ollama:\n" +
+          "1. Install from https://ollama.ai\n" +
+          "2. Run: ollama serve\n" +
+          "3. Pull a model: ollama pull llama3.2:1b"
+        );
       }
+
+      reply = await generateText(prompt);
+      console.log("✅ Response generated successfully using local LLM");
+    } catch (llmError: any) {
+      console.error("❌ Local LLM error:", llmError);
       
-      // For other errors, throw to be caught by outer catch
-      throw geminiError;
+      // Fallback: Return recipes directly without AI enhancement
+      console.log("⚠️ LLM unavailable. Returning recipes directly without AI enhancement...");
+      
+      // Extract number from query (e.g., "3 recipes" -> 3)
+      const numberMatch = message.match(/\b(\d+)\s*(?:recipe|recipes|dish|dishes)?\b/i);
+      const requestedCount = numberMatch ? parseInt(numberMatch[1], 10) : null;
+      
+      // Deduplicate results by title (case-insensitive)
+      const seenTitles = new Set<string>();
+      const uniqueResults = results.filter((r: any) => {
+        const titleLower = r.title?.toLowerCase().trim();
+        if (!titleLower || seenTitles.has(titleLower)) {
+          return false;
+        }
+        seenTitles.add(titleLower);
+        return true;
+      });
+      
+      // Limit to requested number or default to 3
+      const limit = requestedCount && requestedCount > 0 ? requestedCount : 3;
+      const finalResults = uniqueResults.slice(0, limit);
+      
+      // Format response without markdown (TTS-friendly)
+      reply = `I found ${finalResults.length} recipe${finalResults.length > 1 ? 's' : ''} matching your query:\n\n`;
+      
+      finalResults.forEach((r: any, index: number) => {
+        reply += `Recipe ${index + 1}: ${r.title}\n`;
+        
+        const totalTime = (r.prepTime || 0) + (r.cookTime || 0);
+        if (totalTime > 0) {
+          reply += `Total time: ${totalTime} minutes`;
+          if (r.prepTime && r.cookTime) {
+            reply += ` (${r.prepTime} minutes prep, ${r.cookTime} minutes cook)`;
+          }
+          reply += `\n`;
+        }
+        
+        if (r.ingredients) {
+          const ingredients = r.ingredients.replace(/,/g, ', ').slice(0, 200);
+          reply += `Ingredients: ${ingredients}${r.ingredients.length > 200 ? '...' : ''}\n`;
+        }
+        
+        if (r.instructions) {
+          const instructions = r.instructions.slice(0, 250).replace(/\n/g, ' ');
+          reply += `Instructions: ${instructions}${r.instructions.length > 250 ? '...' : ''}\n`;
+        }
+        
+        reply += `\n`;
+      });
+      
+      reply += `\nNote: The local LLM service is unavailable. These are the raw recipe results. Please ensure Ollama is installed and running for enhanced AI responses.`;
+      
+      return NextResponse.json({
+        reply,
+        sources: finalResults.map((r: any) => ({
+          title: r.title,
+          prepTime: r.prepTime,
+          cookTime: r.cookTime,
+          distance: r.distance
+        })),
+        llmUnavailable: true
+      });
     }
 
     return NextResponse.json({
@@ -343,7 +301,7 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
     return NextResponse.json(
       { 
         error: errorMessage,
-        reply: "Sorry, I encountered an error processing your request. Please try again in a moment."
+        reply: "Sorry, I encountered an error processing your request. Please check that Ollama is running and try again."
       },
       { status: 500 }
     );
