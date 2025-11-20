@@ -119,42 +119,23 @@ export async function POST(req: Request) {
       });
     }
 
-    // 1️⃣ Create embedding for user query using CUSTOM trained model
-    console.log("🔄 Generating embedding for query using custom model...");
+    // 1️⃣ Create embedding for user query
+    // Uses local model if available, otherwise Hugging Face API (works on Vercel)
+    console.log("🔄 Generating embedding for query...");
     let qEmbedding: number[];
     let qLiteral: string;
     
     try {
-      // Use custom trained embedding model instead of Google API
       qEmbedding = await generateEmbedding(message);
       qLiteral = `[${qEmbedding.join(",")}]`;
       console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
     } catch (embedError: any) {
       console.error("❌ Embedding generation failed:", embedError);
       console.error("Embedding error details:", embedError.message);
-      console.error("Embedding error stack:", embedError.stack);
       
-      // Check if it's a model not found error
-      if (embedError.message?.includes("Model not found") || 
-          embedError.message?.includes("trained model not found") ||
-          embedError.message?.includes("models/recipe-embedder")) {
-        return NextResponse.json({
-          reply: "⚠️ Google Colab trained model not found. Please ensure the model is placed in `models/recipe-embedder/` directory.\n\nThen reload the recipes:\n```bash\nnpm run load\n```"
-        }, { status: 500 });
-      }
-      
-      // Python/script errors
-      if (embedError.message?.includes("Python") || 
-          embedError.message?.includes("inference.py") ||
-          embedError.message?.includes("spawn") ||
-          embedError.message?.includes("ENOENT")) {
-        return NextResponse.json({
-          reply: "⚠️ Embedding model error: Python inference script is not available. This is expected on Vercel as Python is not supported. Please use a cloud embedding service or deploy the model separately."
-        }, { status: 500 });
-      }
-      
+      // On Vercel, Hugging Face API should work, so this is unexpected
       return NextResponse.json({
-        reply: `⚠️ Embedding generation failed: ${embedError.message || "Unknown error"}. Please check the embedding model setup.`
+        reply: `⚠️ Embedding generation failed: ${embedError.message || "Unknown error"}. Please try again in a moment.`
       }, { status: 500 });
     }
 
@@ -208,9 +189,11 @@ export async function POST(req: Request) {
     console.log("✅ Found", results.length, "matching recipes");
 
     // Check if this is a general question (not recipe-related)
-    const isGeneralQuestion = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim()) ||
-                               message.trim().length < 10 ||
-                               (!message.toLowerCase().match(/\b(recipe|ingredient|food|dish|cook|bake|make|prepare|cuisine|meal|breakfast|lunch|dinner|snack|dessert|appetizer|chicken|beef|pork|fish|vegetable|pasta|rice|bread|soup|salad|pizza|burger|sandwich|cake|cookie|pie|sauce|spice|herb|flavor|taste|kitchen|cooking|baking|grill|fry|boil|steam|roast)\b/i) && results.length === 0);
+    // Only treat as general if it's clearly a greeting/small talk AND no recipes found
+    const isGeneralQuestion = results.length === 0 && (
+      /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)$/i.test(message.trim()) ||
+      (message.trim().length < 10 && !message.toLowerCase().match(/\b(recipe|ingredient|food|dish|cook|bake|make|prepare|cuisine|meal|breakfast|lunch|dinner|snack|dessert|appetizer|chicken|beef|pork|fish|vegetable|pasta|rice|bread|soup|salad|pizza|burger|sandwich|cake|cookie|pie|sauce|spice|herb|flavor|taste|kitchen|cooking|baking|grill|fry|boil|steam|roast)\b/i))
+    );
 
     // If it's a general question, skip recipe search and go directly to LLM
     if (isGeneralQuestion && results.length === 0) {
@@ -219,17 +202,29 @@ export async function POST(req: Request) {
       // Build conversation history for context
       let conversationContext = "";
       if (history.length > 0) {
-        conversationContext = "\n\nPrevious conversation:\n";
-        history.slice(-5).forEach((msg: any) => {
-          conversationContext += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`;
+        const recentHistory = history.slice(-6);
+        conversationContext = "\n\n=== CONVERSATION HISTORY ===\n";
+        recentHistory.forEach((msg: any) => {
+          const role = msg.role === "user" ? "USER" : "ASSISTANT";
+          conversationContext += `${role}: ${msg.content}\n\n`;
         });
+        conversationContext += "=== END HISTORY ===\n\n";
       }
       
       const generalPrompt = `You are a friendly and helpful AI chef assistant. You can help with cooking questions, recipe suggestions, and general conversation.
 
-User: ${message}${conversationContext}
+${conversationContext}
 
-Provide a friendly, helpful response. If the user is greeting you, greet them back warmly. If they're asking for help, offer assistance. Keep responses concise and natural. Use plain text only (no markdown formatting).`;
+CURRENT USER MESSAGE: ${message}
+
+Provide a friendly, helpful response that:
+- If the user is greeting you, greet them back warmly
+- If they're asking for help, offer assistance
+- If this is a follow-up question, reference the conversation history naturally
+- Keep responses concise and natural
+- Use ONLY plain text - NO markdown formatting
+
+Your response:`;
 
       try {
         const ollamaAvailable = await checkOllamaAvailable();
@@ -241,7 +236,7 @@ Provide a friendly, helpful response. If the user is greeting you, greet them ba
 
         const reply = await generateText(generalPrompt);
         return NextResponse.json({ reply });
-      } catch (error: any) {
+      } catch {
         // Fallback response for general questions
         const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
         const responses: { [key: string]: string } = {
@@ -305,38 +300,44 @@ Cuisine: ${r.cuisine || "Not specified"}
     // 3️⃣ Ask local LLM (Ollama) to answer based on DB context
     const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
     
-    // Build conversation history for context
+    // Build conversation history for context - format it properly
     let conversationContext = "";
     if (history.length > 0) {
-      conversationContext = "\n\nPrevious conversation context:\n";
-      history.slice(-5).forEach((msg: any) => {
-        conversationContext += `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}\n`;
+      const recentHistory = history.slice(-6); // Last 6 messages (3 exchanges)
+      conversationContext = "\n\n=== CONVERSATION HISTORY ===\n";
+      recentHistory.forEach((msg: any) => {
+        const role = msg.role === "user" ? "USER" : "ASSISTANT";
+        conversationContext += `${role}: ${msg.content}\n\n`;
       });
-      conversationContext += "\nUse the conversation history to understand context and provide relevant responses.\n";
+      conversationContext += "=== END HISTORY ===\n\n";
+      conversationContext += "IMPORTANT: Use the conversation history above to understand context. If the user is asking a follow-up question, refer to what was discussed earlier. Keep responses relevant to the current query while considering previous context.\n";
     }
     
-    const prompt = `
-You are a professional chef AI assistant.
+    const prompt = `You are a professional chef AI assistant. Your job is to help users find recipes and answer cooking questions.
 
-Current user query: "${message}"
-${countInstruction}
 ${conversationContext}
 
-Here are the most relevant recipes from the database:
+CURRENT USER QUERY: "${message}"
+${countInstruction}
+
+AVAILABLE RECIPES FROM DATABASE:
 ${context}
 
-Based on these recipes and the conversation history, provide a helpful response that:
-- Answers the user's query directly, considering any previous context
-- ${requestedCount ? `Provides exactly ${requestedCount} recipe${requestedCount > 1 ? 's' : ''} as requested` : 'Recommends the best matching recipe(s)'}
-- Explains why they fit the user's needs
-- Provides clear step-by-step instructions
-- Suggests alternatives if relevant
-- References previous conversation if relevant (e.g., "as you mentioned earlier", "like we discussed")
+INSTRUCTIONS:
+1. Answer the user's CURRENT query: "${message}"
+2. ${requestedCount ? `Provide exactly ${requestedCount} recipe${requestedCount > 1 ? 's' : ''} as requested` : 'Recommend the best matching recipe(s) from the database above'}
+3. ${history.length > 0 ? 'If this is a follow-up question, reference the conversation history naturally (e.g., "As you asked earlier...", "Based on our previous discussion...")' : 'Provide a clear, helpful response'}
+4. Explain why the recipe(s) fit the user's needs
+5. Provide clear step-by-step instructions when relevant
+6. Use ONLY plain text - NO markdown, NO asterisks, NO special formatting
+7. Write naturally for both reading and text-to-speech
 
-IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special characters that would be read aloud by text-to-speech. Use plain text only. Format your response naturally for both reading and listening.
-`;
+Now provide your response:`;
 
     console.log("🤖 Asking local LLM (Ollama) for response...");
+    if (history.length > 0) {
+      console.log(`📜 Using conversation history (${history.length} messages)`);
+    }
     let reply: string;
     
     try {
@@ -361,45 +362,33 @@ IMPORTANT: Do NOT use markdown formatting like asterisks (**), bold, or special 
       try {
         reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
         console.log("✅ Generated intelligent fallback response");
-      } catch (fallbackError) {
+      } catch {
         // Final fallback: Return recipes directly without AI enhancement
         console.log("⚠️ Using basic recipe listing fallback...");
         
         // Check if it's a general question for fallback
-      const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
+        const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
       
-      if (isGeneralQuestionFallback) {
-        const responses: { [key: string]: string } = {
-          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
-          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
-          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
-          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
-          "thank you": "You're very welcome! Happy cooking!",
-          "bye": "Goodbye! Happy cooking!",
-          "goodbye": "See you later! Enjoy your cooking!",
-          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
-        };
-        
-        const lowerMessage = message.toLowerCase().trim();
-        const reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
-        
-        return NextResponse.json({ reply, llmUnavailable: true });
-      }
-      
-      // Extract number from query (e.g., "3 recipes" -> 3)
-      const numberMatch = message.match(/\b(\d+)\s*(?:recipe|recipes|dish|dishes)?\b/i);
-      const requestedCount = numberMatch ? parseInt(numberMatch[1], 10) : null;
-      
-      // Deduplicate results by title (case-insensitive)
-      const seenTitles = new Set<string>();
-      const uniqueResults = results.filter((r: any) => {
-        const titleLower = r.title?.toLowerCase().trim();
-        if (!titleLower || seenTitles.has(titleLower)) {
-          return false;
+        if (isGeneralQuestionFallback) {
+          const responses: { [key: string]: string } = {
+            "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
+            "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
+            "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
+            "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
+            "thank you": "You're very welcome! Happy cooking!",
+            "bye": "Goodbye! Happy cooking!",
+            "goodbye": "See you later! Enjoy your cooking!",
+            "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+          };
+          
+          const lowerMessage = message.toLowerCase().trim();
+          reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
+          
+          return NextResponse.json({ reply, llmUnavailable: true });
         }
-        seenTitles.add(titleLower);
-        return true;
-      });
+      
+        // Use the already-declared requestedCount and uniqueResults from outer scope
+        // No need to redeclare them
       
       // Limit to requested number or default to 3
       const limit = requestedCount && requestedCount > 0 ? requestedCount : 3;
