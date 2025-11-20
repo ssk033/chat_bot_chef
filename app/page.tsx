@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { BackgroundBeamsWithCollision } from "@/components/ui/background-beams-with-collision";
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
 export default function Page() {
   const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
@@ -180,96 +182,99 @@ export default function Page() {
   // TTS now uses browser's built-in Web Speech API (no external services needed)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <BackgroundBeamsWithCollision className="min-h-screen">
+      <div className="container mx-auto px-4 py-8 max-w-4xl relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-600 bg-clip-text text-transparent">
             🍳 Chef Chatbot
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-gray-300">
             Your AI cooking assistant powered by recipe search
           </p>
           {/* Model Status Indicator */}
           <div className="mt-3 flex items-center justify-center gap-2">
             {modelStatus.loading ? (
-              <span className="text-xs text-gray-500 dark:text-gray-400">Checking model...</span>
+              <span className="text-xs text-gray-400">Checking model...</span>
             ) : modelStatus.available ? (
-              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-xs text-cyan-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
                 Google Colab trained model active (1M recipes, 450K examples)
               </span>
             ) : (
-              <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+              <span className="text-xs text-blue-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                 Model checking...
               </span>
             )}
           </div>
         </div>
 
-        {/* Chat Messages */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 h-[500px] overflow-y-auto border border-gray-200 dark:border-gray-700">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-center">
-              <div>
-                <div className="text-6xl mb-4">👨‍🍳</div>
-                <p className="text-gray-500 dark:text-gray-400 text-lg">
-                  Ask me about recipes, ingredients, or cooking tips!
-                </p>
-                <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
-                  Try: &quot;What can I make with chicken and rice?&quot;
-                </p>
+        {/* Chat Messages - Card with Background Gradient */}
+        <BackgroundGradient className="rounded-2xl max-w-full p-1 mb-6">
+          <div className="bg-black/90 rounded-2xl p-6 h-[500px] overflow-y-auto">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-center">
+                <div>
+                  <div className="text-6xl mb-4">👨‍🍳</div>
+                  <p className="text-gray-300 text-lg">
+                    Ask me about recipes, ingredients, or cooking tips!
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    Try: &quot;What can I make with chicken and rice?&quot;
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${
-                    m.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
+            ) : (
+              <div className="space-y-4">
+                {messages.map((m, i) => (
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      m.role === "user"
-                        ? "bg-blue-600 text-white rounded-br-sm"
-                        : "bg-gradient-to-br from-orange-100 to-amber-100 dark:from-gray-700 dark:to-gray-600 text-gray-900 dark:text-gray-100 rounded-bl-sm"
+                    key={i}
+                    className={`flex ${
+                      m.role === "user" ? "justify-end" : "justify-start"
                     }`}
                   >
-                    <div className="font-semibold text-sm mb-1 opacity-90">
-                      {m.role === "user" ? "You" : "👨‍🍳 Chef"}
-                    </div>
-                    <div className="whitespace-pre-wrap leading-relaxed">
-                      {m.text.replace(/"/g, '&quot;')}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-sm px-4 py-3">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        m.role === "user"
+                          ? "bg-blue-600 text-white rounded-br-sm"
+                          : "bg-gray-800/80 text-gray-100 rounded-bl-sm border border-gray-700/50"
+                      }`}
+                    >
+                      <div className="font-semibold text-sm mb-1 opacity-90">
+                        {m.role === "user" ? "You" : "👨‍🍳 Chef"}
                       </div>
-                      <span className="ml-2">Chef is thinking...</span>
+                      <div className="whitespace-pre-wrap leading-relaxed">
+                        {m.text.replace(/"/g, '&quot;')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-800/80 rounded-2xl rounded-bl-sm px-4 py-3 border border-gray-700/50">
+                      <div className="flex items-center gap-2 text-gray-300">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                        </div>
+                        <span className="ml-2">Chef is thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </BackgroundGradient>
 
-        {/* Input Area */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700">
+        {/* Input Area - Card with Background Gradient */}
+        <BackgroundGradient className="rounded-2xl max-w-full p-1">
+          <div className="bg-black/90 rounded-2xl p-4 border border-gray-800/50">
           <div className="flex gap-3">
             <input
-              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:focus:ring-orange-900 transition-all"
+              className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-700 bg-gray-900/50 text-gray-100 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && send()}
@@ -279,7 +284,7 @@ export default function Page() {
             <button
               onClick={send}
               disabled={isLoading || !input.trim()}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-700 hover:to-blue-800 active:scale-95 transition-all shadow-lg hover:shadow-xl"
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-500 hover:to-cyan-500 active:scale-95 transition-all shadow-lg hover:shadow-xl"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -292,7 +297,7 @@ export default function Page() {
             {isPlaying ? (
               <button
                 onClick={stopAudio}
-                className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:from-red-700 hover:to-red-800 active:scale-95 transition-all shadow-lg hover:shadow-xl"
+                className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-semibold hover:from-red-500 hover:to-red-600 active:scale-95 transition-all shadow-lg hover:shadow-xl"
               >
                 ⏹️ Stop
               </button>
@@ -300,17 +305,18 @@ export default function Page() {
               <button
                 onClick={playLatestWithBrowserTTS}
                 disabled={messages.filter(m => m.role === "bot").length === 0}
-                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-700 hover:to-green-800 active:scale-95 transition-all shadow-lg hover:shadow-xl"
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-500 hover:to-emerald-500 active:scale-95 transition-all shadow-lg hover:shadow-xl"
               >
                 🔊 Speak
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">
+          <p className="text-xs text-gray-400 mt-3 text-center">
             Using browser text-to-speech (free & unlimited) • Press Enter to send
           </p>
-        </div>
+          </div>
+        </BackgroundGradient>
       </div>
-    </div>
+    </BackgroundBeamsWithCollision>
   );
 }
