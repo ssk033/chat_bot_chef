@@ -242,33 +242,32 @@ Your response:`;
 
       try {
         const ollamaAvailable = await checkOllamaAvailable();
-        if (!ollamaAvailable) {
-          return NextResponse.json({
-            reply: "Hello! I'm your AI chef assistant. I can help you find recipes and answer cooking questions. However, I need Ollama to be running for full functionality. Please install Ollama from https://ollama.ai"
-          });
+        if (ollamaAvailable) {
+          const reply = await generateText(generalPrompt);
+          return NextResponse.json({ reply });
         }
-
-        const reply = await generateText(generalPrompt);
-        return NextResponse.json({ reply });
+        // If Ollama not available, fall through to fallback responses below
       } catch {
-        // Fallback response for general questions
-        const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
-        const responses: { [key: string]: string } = {
-          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
-          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
-          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
-          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
-          "thank you": "You're very welcome! Happy cooking!",
-          "bye": "Goodbye! Happy cooking!",
-          "goodbye": "See you later! Enjoy your cooking!",
-          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
-        };
-        
-        const lowerMessage = message.toLowerCase().trim();
-        const reply = responses[lowerMessage] || greetings[Math.floor(Math.random() * greetings.length)] + " I'm your AI chef assistant. How can I help you with recipes?";
-        
-        return NextResponse.json({ reply });
+        // Fall through to fallback
       }
+      
+      // Fallback response for general questions (works without Ollama)
+      const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
+      const responses: { [key: string]: string } = {
+        "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
+        "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
+        "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
+        "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
+        "thank you": "You're very welcome! Happy cooking!",
+        "bye": "Goodbye! Happy cooking!",
+        "goodbye": "See you later! Enjoy your cooking!",
+        "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+      };
+      
+      const lowerMessage = message.toLowerCase().trim();
+      const reply = responses[lowerMessage] || greetings[Math.floor(Math.random() * greetings.length)] + " I'm your AI chef assistant. How can I help you with recipes?";
+      
+      return NextResponse.json({ reply });
     }
 
     if (results.length === 0) {
@@ -311,7 +310,7 @@ Cuisine: ${r.cuisine || "Not specified"}
 `;
     }
 
-    // 3️⃣ Ask local LLM (Ollama) to answer based on DB context
+    // 3️⃣ Generate response - try Ollama first, fallback to intelligent response
     const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
     
     // Build conversation history for context - format it properly
@@ -348,31 +347,26 @@ INSTRUCTIONS:
 
 Now provide your response:`;
 
-    console.log("🤖 Asking local LLM (Ollama) for response...");
+    console.log("🤖 Generating response...");
     if (history.length > 0) {
       console.log(`📜 Using conversation history (${history.length} messages)`);
     }
     let reply: string;
     
     try {
-      // Check if Ollama is available
+      // Try Ollama first (if available)
       const ollamaAvailable = await checkOllamaAvailable();
-      if (!ollamaAvailable) {
-        throw new Error(
-          "Ollama is not running. Please install and start Ollama:\n" +
-          "1. Install from https://ollama.ai\n" +
-          "2. Run: ollama serve\n" +
-          "3. Pull a model: ollama pull llama3.2:1b"
-        );
+      if (ollamaAvailable) {
+        reply = await generateText(prompt);
+        console.log("✅ Response generated successfully using Ollama LLM");
+      } else {
+        // Ollama not available, use intelligent fallback
+        throw new Error("Ollama not available");
       }
-
-      reply = await generateText(prompt);
-      console.log("✅ Response generated successfully using local LLM");
     } catch (llmError: any) {
-      console.error("❌ Local LLM error:", llmError);
-      console.log("⚠️ LLM unavailable. Using intelligent fallback response...");
+      console.log("⚠️ LLM unavailable, using intelligent fallback response...");
       
-      // Intelligent fallback: Generate a helpful response from recipes
+      // Intelligent fallback: Generate a helpful response from recipes (works without Ollama)
       try {
         reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
         console.log("✅ Generated intelligent fallback response");
