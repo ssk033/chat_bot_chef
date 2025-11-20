@@ -113,61 +113,68 @@ export async function POST(req: Request) {
       });
     }
 
+    // Note: We'll use text search if embeddings are not available
     if (embeddingCountNum === 0) {
-      return NextResponse.json({
-        reply: "I have recipes in the database, but they don't have embeddings yet. This means the vector search won't work. Please run the load script again to generate embeddings:\n\n```bash\nnpm run load\n```"
-      });
+      console.log("⚠️ No embeddings found, will use text-based search");
     }
 
-    // 1️⃣ Create embedding for user query
-    // Uses local model if available, otherwise Hugging Face API (works on Vercel)
-    console.log("🔄 Generating embedding for query...");
-    let qEmbedding: number[];
-    let qLiteral: string;
+    // 1️⃣ Try to create embedding for user query (optional - will use text search if fails)
+    console.log("🔄 Attempting to generate embedding for query...");
+    let qEmbedding: number[] | null = null;
+    let qLiteral: string | null = null;
+    let useVectorSearch = false;
     
     try {
       qEmbedding = await generateEmbedding(message);
       qLiteral = `[${qEmbedding.join(",")}]`;
+      useVectorSearch = true;
       console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
     } catch (embedError: any) {
-      console.error("❌ Embedding generation failed:", embedError);
-      console.error("Embedding error details:", embedError.message);
-      
-      // On Vercel, Hugging Face API should work, so this is unexpected
-      return NextResponse.json({
-        reply: `⚠️ Embedding generation failed: ${embedError.message || "Unknown error"}. Please try again in a moment.`
-      }, { status: 500 });
+      console.warn("⚠️ Embedding generation failed, will use text search instead:", embedError.message);
+      // Don't return error - continue with text search fallback
+      useVectorSearch = false;
     }
 
-    // 2️⃣ Vector similarity search
+    // 2️⃣ Search for recipes - try vector search first, fallback to text search
     console.log("🔍 Searching for similar recipes...");
     let results: any[] = [];
     
-    try {
-      // Escape the literal to prevent SQL injection (though it's already a number array)
-      const sanitizedLiteral = qLiteral.replace(/'/g, "''");
-      results = await prisma.$queryRawUnsafe(`
-        SELECT r.*, e.vector <-> '${sanitizedLiteral}'::vector AS distance
-        FROM "embeddings" e
-        JOIN "Recipe" r ON e."recipeId" = r.id
-        ORDER BY e.vector <-> '${sanitizedLiteral}'::vector
-        LIMIT 5;
-      `) as any[];
-    } catch (searchError: any) {
-      console.error("❌ Vector search failed:", searchError);
-      
-      // If vector search fails, try a simple text search as fallback
-      console.log("🔄 Falling back to text search...");
+    if (useVectorSearch && qLiteral) {
       try {
-        const searchTerms = message.toLowerCase().split(/\s+/).filter((term: string) => term.length > 2);
+        // Escape the literal to prevent SQL injection (though it's already a number array)
+        const sanitizedLiteral = qLiteral.replace(/'/g, "''");
+        results = await prisma.$queryRawUnsafe(`
+          SELECT r.*, e.vector <-> '${sanitizedLiteral}'::vector AS distance
+          FROM "embeddings" e
+          JOIN "Recipe" r ON e."recipeId" = r.id
+          ORDER BY e.vector <-> '${sanitizedLiteral}'::vector
+          LIMIT 5;
+        `) as any[];
+        console.log("✅ Found", results.length, "recipes using vector search");
+      } catch (searchError: any) {
+        console.warn("⚠️ Vector search failed, falling back to text search:", searchError.message);
+        useVectorSearch = false; // Fall through to text search
+      }
+    }
+    
+    // If vector search didn't work or wasn't attempted, use text search
+    if (!useVectorSearch || results.length === 0) {
+      console.log("🔄 Using text-based search...");
+      try {
+        // Extract meaningful search terms from query
+        const searchTerms = message
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this'].includes(term));
         
         if (searchTerms.length > 0) {
-          // Use Prisma's OR query for text search
+          // Use Prisma's OR query for text search - search in title, ingredients, and instructions
           const textResults = await prisma.recipe.findMany({
             where: {
               OR: searchTerms.flatMap((term: string) => [
                 { title: { contains: term, mode: 'insensitive' as const } },
-                { ingredients: { contains: term, mode: 'insensitive' as const } }
+                { ingredients: { contains: term, mode: 'insensitive' as const } },
+                { instructions: { contains: term, mode: 'insensitive' as const } }
               ])
             },
             take: 5
@@ -175,13 +182,20 @@ export async function POST(req: Request) {
           
           // Convert to same format as vector search results
           results = textResults.map(r => ({ ...r, distance: 0.5 }));
+          console.log("✅ Found", results.length, "recipes using text search");
+        } else {
+          // If no search terms, get random recipes
+          results = await prisma.recipe.findMany({
+            take: 5,
+            orderBy: { id: 'asc' }
+          });
+          results = results.map(r => ({ ...r, distance: 0.5 }));
+          console.log("✅ No specific search terms, returning sample recipes");
         }
-        
-        console.log("✅ Found", results.length, "recipes using text search");
       } catch (fallbackError: any) {
-        console.error("❌ Fallback search also failed:", fallbackError);
+        console.error("❌ Text search also failed:", fallbackError);
         return NextResponse.json({
-          reply: "I encountered an error searching for recipes. The database might not be properly configured. Please check:\n1. Database connection is working\n2. Recipes are loaded\n3. Vector extension (pgvector) is enabled"
+          reply: "I encountered an error searching for recipes. The database might not be properly configured. Please check:\n1. Database connection is working\n2. Recipes are loaded"
         }, { status: 500 });
       }
     }
