@@ -87,18 +87,11 @@ export default function Page() {
     lastRequestTime.current = now;
 
     try {
-      // Send conversation history along with current message
-      // Map "bot" to "assistant" for backend compatibility
-      const conversationHistory = messages.map(m => ({
-        role: m.role === "user" ? "user" : "assistant",
-        content: m.text.trim()
-      })).filter(m => m.content.length > 0); // Remove empty messages
-      
+      // Send only current message (no history)
       const res = await fetch("/api/query", {
         method: "POST",
         body: JSON.stringify({ 
-          message: userInput,
-          history: conversationHistory 
+          message: userInput
         }),
         headers: { "Content-Type": "application/json" },
       });

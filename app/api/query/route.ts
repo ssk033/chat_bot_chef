@@ -103,7 +103,7 @@ function generateIntelligentFallbackResponse(
 
 export async function POST(req: Request) {
   try {
-    const { message, history = [] } = await req.json();
+    const { message } = await req.json();
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
@@ -276,28 +276,13 @@ export async function POST(req: Request) {
     if (isGeneralQuestion && results.length === 0) {
       console.log("💬 Detected general question, skipping recipe search");
       
-      // Build conversation history for context
-      let conversationContext = "";
-      if (history.length > 0) {
-        const recentHistory = history.slice(-6);
-        conversationContext = "\n\n=== CONVERSATION HISTORY ===\n";
-        recentHistory.forEach((msg: any) => {
-          const role = msg.role === "user" ? "USER" : "ASSISTANT";
-          conversationContext += `${role}: ${msg.content}\n\n`;
-        });
-        conversationContext += "=== END HISTORY ===\n\n";
-      }
-      
       const generalPrompt = `You are a friendly and helpful AI chef assistant. You can help with cooking questions, recipe suggestions, and general conversation.
-
-${conversationContext}
 
 CURRENT USER MESSAGE: ${message}
 
 Provide a friendly, helpful response that:
 - If the user is greeting you, greet them back warmly
 - If they're asking for help, offer assistance
-- If this is a follow-up question, reference the conversation history naturally
 - Keep responses concise and natural
 - Use ONLY plain text - NO markdown formatting
 
@@ -377,22 +362,7 @@ Cuisine: ${r.cuisine || "Not specified"}
     // 3️⃣ Generate response - try Ollama first, fallback to intelligent response
     const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
     
-    // Build conversation history for context - format it properly
-    let conversationContext = "";
-    if (history.length > 0) {
-      const recentHistory = history.slice(-6); // Last 6 messages (3 exchanges)
-      conversationContext = "\n\n=== CONVERSATION HISTORY ===\n";
-      recentHistory.forEach((msg: any) => {
-        const role = msg.role === "user" ? "USER" : "ASSISTANT";
-        conversationContext += `${role}: ${msg.content}\n\n`;
-      });
-      conversationContext += "=== END HISTORY ===\n\n";
-      conversationContext += "IMPORTANT: Use the conversation history above to understand context. If the user is asking a follow-up question, refer to what was discussed earlier. Keep responses relevant to the current query while considering previous context.\n";
-    }
-    
     const prompt = `You are a professional chef AI assistant. Your job is to help users find recipes and answer cooking questions.
-
-${conversationContext}
 
 CURRENT USER QUERY: "${message}"
 ${countInstruction}
@@ -403,18 +373,16 @@ ${context}
 INSTRUCTIONS:
 1. Answer the user's CURRENT query: "${message}"
 2. ${requestedCount ? `Provide exactly ${requestedCount} recipe${requestedCount > 1 ? 's' : ''} as requested` : 'Recommend the best matching recipe(s) from the database above'}
-3. ${history.length > 0 ? 'If this is a follow-up question, reference the conversation history naturally (e.g., "As you asked earlier...", "Based on our previous discussion...")' : 'Provide a clear, helpful response'}
+3. Provide a clear, helpful response based ONLY on the current query
 4. Explain why the recipe(s) fit the user's needs
 5. Provide clear step-by-step instructions when relevant
 6. Use ONLY plain text - NO markdown, NO asterisks, NO special formatting
 7. Write naturally for both reading and text-to-speech
+8. DO NOT reference previous conversations or history - treat each query as fresh
 
 Now provide your response:`;
 
     console.log("🤖 Generating response...");
-    if (history.length > 0) {
-      console.log(`📜 Using conversation history (${history.length} messages)`);
-    }
     let reply: string;
     
     try {
