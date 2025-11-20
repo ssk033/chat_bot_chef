@@ -86,10 +86,11 @@ export default function Page() {
 
     try {
       // Send conversation history along with current message
+      // Map "bot" to "assistant" for backend compatibility
       const conversationHistory = messages.map(m => ({
         role: m.role === "user" ? "user" : "assistant",
-        content: m.text
-      }));
+        content: m.text.trim()
+      })).filter(m => m.content.length > 0); // Remove empty messages
       
       const res = await fetch("/api/query", {
         method: "POST",
