@@ -195,11 +195,12 @@ Instructions: ${recipe.instructions}
           errorCount++;
           
           // If it's a model loading error, stop immediately
-          if (err?.message?.includes("Model not found") || err?.message?.includes("train the model")) {
+          if (err?.message?.includes("Model not found") || 
+              err?.message?.includes("trained model not found") ||
+              err?.message?.includes("models/recipe-embedder")) {
             console.error(`\n❌ Model Error:`);
-            console.error("   The custom embedding model is not trained yet.");
-            console.error("   Please train the model first by running:");
-            console.error("   python scripts/train_model.py\n");
+            console.error("   The Google Colab trained embedding model is not found.");
+            console.error("   Please ensure the model is placed in `models/recipe-embedder/` directory.");
             shouldStop = true;
             if (parser) parser.abort();
             reject(err);
