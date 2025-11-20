@@ -6,6 +6,26 @@ import { generateText, checkOllamaAvailable } from "@/lib/ollama-client";
 const prisma = new PrismaClient();
 
 /**
+ * Format instructions - handle JSON arrays or plain text
+ */
+function formatInstructions(instructions: string | null | undefined): string {
+  if (!instructions) return "Not specified";
+  
+  try {
+    // Try to parse as JSON array
+    const parsed = JSON.parse(instructions);
+    if (Array.isArray(parsed)) {
+      return parsed.map((step: string, index: number) => `${index + 1}. ${step}`).join('\n');
+    }
+  } catch {
+    // Not JSON, treat as plain text
+  }
+  
+  // If it's plain text, return as is (but clean up if needed)
+  return instructions;
+}
+
+/**
  * Generate intelligent fallback response when LLM is unavailable
  */
 function generateIntelligentFallbackResponse(
@@ -44,7 +64,8 @@ function generateIntelligentFallbackResponse(
     reply += `.\n\n`;
   } else if (isAskingForInstructions && finalResults[0].instructions) {
     reply = `Here's how to make ${finalResults[0].title}:\n\n`;
-    reply += `${finalResults[0].instructions.slice(0, 500)}${finalResults[0].instructions.length > 500 ? '...' : ''}\n\n`;
+    const formattedInstructions = formatInstructions(finalResults[0].instructions);
+    reply += `${formattedInstructions.slice(0, 500)}${formattedInstructions.length > 500 ? '...' : ''}\n\n`;
   } else {
     // General recipe recommendation
     reply = `I found ${finalResults.length} great recipe${finalResults.length > 1 ? 's' : ''} for you:\n\n`;
@@ -165,23 +186,65 @@ export async function POST(req: Request) {
         const searchTerms = message
           .toLowerCase()
           .split(/\s+/)
-          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this'].includes(term));
+          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'give', 'me', 'recipes', 'recipe'].includes(term));
+        
+        // Extract prep time filter if mentioned
+        const prepTimeMatch = message.match(/(\d+)\s*(?:min|minute|mins)\s*(?:prep|preparation)/i);
+        const maxPrepTime = prepTimeMatch ? parseInt(prepTimeMatch[1], 10) : null;
         
         if (searchTerms.length > 0) {
-          // Use Prisma's OR query for text search - search in title, ingredients, and instructions
+          // Build search query - prioritize ingredients, then title
+          const whereClause: any = {
+            OR: [
+              // First priority: ingredients (most important for ingredient-based queries)
+              ...searchTerms.map((term: string) => ({
+                ingredients: { contains: term, mode: 'insensitive' as const }
+              })),
+              // Second priority: title
+              ...searchTerms.map((term: string) => ({
+                title: { contains: term, mode: 'insensitive' as const }
+              })),
+              // Third priority: instructions
+              ...searchTerms.map((term: string) => ({
+                instructions: { contains: term, mode: 'insensitive' as const }
+              }))
+            ]
+          };
+          
+          // Add prep time filter if specified
+          if (maxPrepTime !== null) {
+            whereClause.prepTime = { lte: maxPrepTime };
+          }
+          
           const textResults = await prisma.recipe.findMany({
-            where: {
-              OR: searchTerms.flatMap((term: string) => [
-                { title: { contains: term, mode: 'insensitive' as const } },
-                { ingredients: { contains: term, mode: 'insensitive' as const } },
-                { instructions: { contains: term, mode: 'insensitive' as const } }
-              ])
-            },
-            take: 5
+            where: whereClause,
+            take: 10, // Get more results to filter better
+            orderBy: [
+              // Prioritize recipes with matching ingredients
+              { ingredients: 'asc' }
+            ]
           });
           
-          // Convert to same format as vector search results
-          results = textResults.map(r => ({ ...r, distance: 0.5 }));
+          // Filter and sort results by relevance
+          const scoredResults = textResults.map(r => {
+            let score = 0;
+            const lowerTitle = (r.title || '').toLowerCase();
+            const lowerIngredients = (r.ingredients || '').toLowerCase();
+            
+            searchTerms.forEach((term: string) => {
+              if (lowerIngredients.includes(term)) score += 10; // High score for ingredient match
+              if (lowerTitle.includes(term)) score += 5; // Medium score for title match
+            });
+            
+            return { ...r, distance: 1 - (score / 100), relevanceScore: score };
+          });
+          
+          // Sort by relevance and take top 5
+          results = scoredResults
+            .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+            .slice(0, 5)
+            .map(({ relevanceScore, ...r }) => ({ ...r, distance: r.distance }));
+          
           console.log("✅ Found", results.length, "recipes using text search");
         } else {
           // If no search terms, get random recipes
@@ -298,10 +361,11 @@ Your response:`;
     // Build context from unique, limited results
     let context = "";
     for (const r of aiResults) {
+      const formattedInstructions = formatInstructions(r.instructions);
       context += `
 Recipe: ${r.title}
 Ingredients: ${r.ingredients || "Not specified"}
-Instructions: ${r.instructions?.slice(0, 400) || "Not specified"}
+Instructions: ${formattedInstructions.slice(0, 400)}${formattedInstructions.length > 400 ? '...' : ''}
 Prep Time: ${r.prepTime || "Not specified"} minutes
 Cook Time: ${r.cookTime || "Not specified"} minutes
 Total Time: ${r.totalTime || "Not specified"} minutes
@@ -423,8 +487,9 @@ Now provide your response:`;
         }
         
         if (r.instructions) {
-          const instructions = r.instructions.slice(0, 250).replace(/\n/g, ' ');
-          reply += `Instructions: ${instructions}${r.instructions.length > 250 ? '...' : ''}\n`;
+          const formattedInstructions = formatInstructions(r.instructions);
+          const instructions = formattedInstructions.slice(0, 250).replace(/\n/g, ' ');
+          reply += `Instructions: ${instructions}${formattedInstructions.length > 250 ? '...' : ''}\n`;
         }
         
         reply += `\n`;
