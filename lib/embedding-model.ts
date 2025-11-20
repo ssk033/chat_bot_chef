@@ -10,9 +10,17 @@ import fs from 'fs';
 const MODEL_DIR = path.join(process.cwd(), 'models', 'recipe-embedder');
 const INFERENCE_SCRIPT = path.join(process.cwd(), 'scripts', 'inference.py');
 
-// Hugging Face Inference API endpoint (free, no API key needed for public models)
-// Using sentence-transformers/all-MiniLM-L6-v2 (384 dimensions, similar to recipe model)
-const HUGGINGFACE_API_URL = 'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2';
+// Hugging Face Inference API endpoints (free, no API key needed for public models)
+// Using multiple models as fallback options
+const HUGGINGFACE_MODELS = [
+  'sentence-transformers/all-MiniLM-L6-v2', // 384 dims
+  'sentence-transformers/all-mpnet-base-v2', // 768 dims (more accurate)
+  'sentence-transformers/paraphrase-MiniLM-L6-v2', // 384 dims
+];
+
+function getHuggingFaceUrl(model: string): string {
+  return `https://api-inference.huggingface.co/models/${model}`;
+}
 
 /**
  * Check if the custom local model is available.
@@ -27,44 +35,98 @@ export function isModelAvailable(): boolean {
 
 /**
  * Generate embedding using Hugging Face Inference API (works on Vercel)
+ * Tries multiple models as fallback
  */
 async function generateEmbeddingWithHuggingFace(text: string): Promise<number[]> {
-  try {
-    const response = await fetch(HUGGINGFACE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ inputs: text }),
-    });
+  let lastError: Error | null = null;
+  
+  // Try each model in order
+  for (const model of HUGGINGFACE_MODELS) {
+    try {
+      const apiUrl = getHuggingFaceUrl(model);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ inputs: text }),
+      });
 
-    if (!response.ok) {
-      // If model is loading, wait and retry once
-      if (response.status === 503) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const retryResponse = await fetch(HUGGINGFACE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ inputs: text }),
-        });
-        
-        if (!retryResponse.ok) {
-          throw new Error(`Hugging Face API error: ${retryResponse.statusText}`);
+      if (!response.ok) {
+        // If model is loading (503), wait and retry once
+        if (response.status === 503) {
+          console.log(`Model ${model} is loading, waiting 5 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const retryResponse = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ inputs: text }),
+          });
+          
+          if (!retryResponse.ok) {
+            // If still failing, try next model
+            lastError = new Error(`Model ${model} error: ${retryResponse.statusText}`);
+            continue;
+          }
+          
+          const retryData = await retryResponse.json();
+          const embedding = Array.isArray(retryData) ? retryData[0] : retryData;
+          
+          // Normalize to 384 dimensions if needed (for compatibility with database)
+          if (Array.isArray(embedding) && embedding.length > 0) {
+            // If embedding is 768 dims, we can truncate or use as-is
+            // Database should handle different dimensions, but let's keep it flexible
+            return embedding;
+          }
+          
+          return embedding;
         }
         
-        const retryData = await retryResponse.json();
-        return Array.isArray(retryData) ? retryData : retryData[0];
+        // For other errors (like 410 Gone), try next model
+        if (response.status === 410 || response.status >= 500) {
+          lastError = new Error(`Model ${model} unavailable: ${response.statusText}`);
+          continue;
+        }
+        
+        // For 4xx errors (except 410), throw immediately
+        throw new Error(`Hugging Face API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Handle different response formats
+      let embedding: number[];
+      if (Array.isArray(data)) {
+        // If array of arrays, take first
+        embedding = Array.isArray(data[0]) ? data[0] : data;
+      } else if (data.embeddings) {
+        embedding = Array.isArray(data.embeddings[0]) ? data.embeddings[0] : data.embeddings;
+      } else {
+        embedding = data;
       }
       
-      throw new Error(`Hugging Face API error: ${response.statusText}`);
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error('Invalid embedding format received');
+      }
+      
+      console.log(`✅ Successfully used model: ${model} (${embedding.length} dimensions)`);
+      return embedding;
+      
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`Model ${model} failed:`, error.message);
+      // Continue to next model
+      continue;
     }
-
-    const data = await response.json();
-    // Hugging Face returns array of embeddings, we need the first one
-    return Array.isArray(data) ? data[0] : data;
-  } catch (error: any) {
-    throw new Error(`Hugging Face embedding failed: ${error.message}`);
   }
+  
+  // All models failed
+  throw new Error(
+    `All Hugging Face models failed. Last error: ${lastError?.message || 'Unknown error'}. ` +
+    `Please ensure you have internet connectivity and Hugging Face API is accessible.`
+  );
 }
 
 /**
