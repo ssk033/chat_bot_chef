@@ -17,7 +17,7 @@ function MealPlanChatContent() {
     const dietaryRestrictions = params.get("dietaryRestrictions") || "none";
     const allergies = params.get("allergies") || "none";
     const proteinTarget = params.get("proteinTarget") || "not specified";
-    return `Generate a meal plan with ingredients: ${ingredients}. Dietary restrictions: ${dietaryRestrictions}. Allergies: ${allergies}. Protein target: ${proteinTarget} grams/day.`;
+    return `Generate a meal plan with ingredients: ${ingredients}. Dietary restrictions: ${dietaryRestrictions}. Allergies: ${allergies}. Protein target: ${proteinTarget} grams/day. Use only recipes that match these ingredients and restrictions.`;
   }, [params]);
 
   useEffect(() => {

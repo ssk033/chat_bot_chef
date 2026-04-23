@@ -24,6 +24,93 @@ function formatInstructions(instructions: string | null | undefined): string {
 }
 
 /**
+ * Format ingredients from JSON arrays or plain text.
+ */
+function formatIngredients(ingredients: string | null | undefined): string {
+  if (!ingredients) return "Not specified";
+
+  try {
+    const parsed = JSON.parse(ingredients);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .join(", ");
+    }
+  } catch {
+    // fall back to plain text
+  }
+
+  return ingredients
+    .replace(/^\[|\]$/g, "")
+    .replace(/","/g, ", ")
+    .replace(/"/g, "")
+    .trim();
+}
+
+function sanitizePlainTextReply(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\[(.*?)\]/g, "$1")
+    .replace(/"\s*,\s*"/g, ", ")
+    .trim();
+}
+
+const COMMON_INGREDIENT_HINTS = [
+  "chicken", "egg", "eggs", "rice", "tomato", "onion", "potato", "garlic", "ginger",
+  "paneer", "milk", "cheese", "butter", "yogurt", "curd", "spinach", "broccoli",
+  "carrot", "beans", "peas", "corn", "mushroom", "capsicum", "bell pepper", "lettuce",
+  "cucumber", "chili", "chilli", "coriander", "cilantro", "mint", "lemon", "lime",
+  "beef", "mutton", "pork", "fish", "shrimp", "prawn", "tuna", "salmon", "oats",
+  "flour", "pasta", "noodles", "bread", "lentils", "dal", "chickpea", "rajma"
+];
+
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i][0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return dp[m][n];
+}
+
+function resolveIngredientToken(token: string): string {
+  const normalized = token.trim().toLowerCase();
+  if (!normalized) return normalized;
+  if (COMMON_INGREDIENT_HINTS.includes(normalized)) return normalized;
+
+  let bestMatch = normalized;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of COMMON_INGREDIENT_HINTS) {
+    const dist = levenshteinDistance(normalized, candidate);
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      bestMatch = candidate;
+    }
+  }
+
+  // Keep original token if not close enough to avoid bad corrections.
+  return bestDistance <= 2 ? bestMatch : normalized;
+}
+
+/**
  * Generate intelligent fallback response when LLM is unavailable
  */
 function generateIntelligentFallbackResponse(
@@ -49,7 +136,7 @@ function generateIntelligentFallbackResponse(
   // Build contextual response
   if (isAskingForIngredients && finalResults[0].ingredients) {
     reply = `Here are the ingredients for ${finalResults[0].title}:\n\n`;
-    reply += `${finalResults[0].ingredients}\n\n`;
+    reply += `${formatIngredients(finalResults[0].ingredients)}\n\n`;
     if (finalResults.length > 1) {
       reply += `I also found ${finalResults.length - 1} other similar recipe${finalResults.length > 2 ? 's' : ''} you might like.\n`;
     }
@@ -84,7 +171,7 @@ function generateIntelligentFallbackResponse(
       }
       
       if (r.ingredients && !isAskingForIngredients) {
-        const ingredients = r.ingredients.replace(/,/g, ', ').slice(0, 150);
+        const ingredients = formatIngredients(r.ingredients).slice(0, 150);
         reply += `   Ingredients: ${ingredients}${r.ingredients.length > 150 ? '...' : ''}\n`;
       }
       
@@ -137,20 +224,33 @@ export async function POST(req: Request) {
       console.log("⚠️ No embeddings found, will use text-based search");
     }
 
+    const mealPlanMatch = message.match(/generate a meal plan with ingredients:\s*([^\.]+)/i);
+    const mealPlanIngredients = mealPlanMatch
+      ? mealPlanMatch[1]
+          .split(",")
+          .map((s) => resolveIngredientToken(s))
+          .filter(Boolean)
+      : [];
+
     // 1️⃣ Try to create embedding for user query (optional - will use text search if fails)
     console.log("🔄 Attempting to generate embedding for query...");
     let qEmbedding: number[] | null = null;
     let qLiteral: string | null = null;
     let useVectorSearch = false;
     
-    try {
-      qEmbedding = await generateEmbedding(message);
-      qLiteral = `[${qEmbedding.join(",")}]`;
-      useVectorSearch = true;
-      console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
-    } catch (embedError: any) {
-      console.warn("⚠️ Embedding generation failed, will use text search instead:", embedError.message);
-      // Don't return error - continue with text search fallback
+    if (mealPlanIngredients.length === 0) {
+      try {
+        qEmbedding = await generateEmbedding(message);
+        qLiteral = `[${qEmbedding.join(",")}]`;
+        useVectorSearch = true;
+        console.log("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
+      } catch (embedError: any) {
+        console.warn("⚠️ Embedding generation failed, will use text search instead:", embedError.message);
+        // Don't return error - continue with text search fallback
+        useVectorSearch = false;
+      }
+    } else {
+      console.log("🍽️ Meal-plan request detected, using ingredient-priority search");
       useVectorSearch = false;
     }
 
@@ -181,10 +281,10 @@ export async function POST(req: Request) {
       console.log("🔄 Using text-based search...");
       try {
         // Extract meaningful search terms from query
-        const searchTerms = message
+        const searchTerms = (mealPlanIngredients.length > 0 ? mealPlanIngredients : message
           .toLowerCase()
           .split(/\s+/)
-          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'give', 'me', 'recipes', 'recipe'].includes(term));
+          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'give', 'me', 'recipes', 'recipe'].includes(term)));
         
         // Extract prep time filter if mentioned
         const prepTimeMatch = message.match(/(\d+)\s*(?:min|minute|mins)\s*(?:prep|preparation)/i);
@@ -230,8 +330,8 @@ export async function POST(req: Request) {
             const lowerIngredients = (r.ingredients || '').toLowerCase();
             
             searchTerms.forEach((term: string) => {
-              if (lowerIngredients.includes(term)) score += 10; // High score for ingredient match
-              if (lowerTitle.includes(term)) score += 5; // Medium score for title match
+              if (lowerIngredients.includes(term)) score += mealPlanIngredients.length > 0 ? 20 : 10;
+              if (lowerTitle.includes(term)) score += mealPlanIngredients.length > 0 ? 2 : 5;
             });
             
             return { ...r, distance: 1 - (score / 100), relevanceScore: score };
@@ -391,7 +491,7 @@ Now provide your response:`;
       // Try Ollama first (if available)
       const ollamaAvailable = await checkOllamaAvailable();
       if (ollamaAvailable) {
-        reply = await generateText(prompt);
+        reply = sanitizePlainTextReply(await generateText(prompt));
         console.log("✅ Response generated successfully using Ollama LLM");
       } else {
         // Ollama not available, use intelligent fallback
@@ -452,7 +552,7 @@ Now provide your response:`;
         }
         
         if (r.ingredients) {
-          const ingredients = r.ingredients.replace(/,/g, ', ').slice(0, 200);
+          const ingredients = formatIngredients(r.ingredients).slice(0, 200);
           reply += `Ingredients: ${ingredients}${r.ingredients.length > 200 ? '...' : ''}\n`;
         }
         
