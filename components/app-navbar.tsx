@@ -24,7 +24,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   };
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[#090d14]/90 backdrop-blur-sm">
+    <nav className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--surface)]/90 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-2.5">
         <Link href="/" className="flex items-center gap-2">
           <span className="chef-icon-badge flex h-9 w-9 items-center justify-center rounded-lg">

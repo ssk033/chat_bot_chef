@@ -3,21 +3,21 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #07080c;
-  --foreground: #f4f7fb;
-  --surface: #0d1119;
-  --surface-muted: #111827;
-  --border-subtle: rgba(148, 163, 184, 0.22);
-  --accent: #34d399;
-  --accent-muted: rgba(52, 211, 153, 0.2);
-  --ring-focus: rgba(74, 222, 128, 0.3);
-  --user-bubble-bg: #f4f7fb;
-  --user-bubble-fg: #0b1020;
-  --muted-text: #9ba3b4;
-  --input-border-focus: #1f2937;
+  --background: #f6fbf8;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #eefbf3;
+  --border-subtle: rgba(15, 23, 42, 0.12);
+  --accent: #16a34a;
+  --accent-muted: rgba(34, 197, 94, 0.14);
+  --ring-focus: rgba(34, 197, 94, 0.28);
+  --user-bubble-bg: #0f172a;
+  --user-bubble-fg: #f8fafc;
+  --muted-text: #475569;
+  --input-border-focus: #86efac;
   --icon-green: #22c55e;
-  --icon-green-bright: #86efac;
-  --icon-green-soft: rgba(74, 222, 128, 0.26);
+  --icon-green-bright: #4ade80;
+  --icon-green-soft: rgba(74, 222, 128, 0.2);
 }
 
 html.dark {
@@ -54,13 +54,13 @@ body {
 .theme-panel {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, transparent), color-mix(in srgb, var(--surface-muted) 90%, transparent));
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 12px 28px rgba(3, 6, 16, 0.34);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--foreground) 14%, transparent);
 }
 
 .theme-section {
   border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
-  background: linear-gradient(180deg, rgba(10, 15, 25, 0.82), rgba(9, 12, 19, 0.92));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, transparent), color-mix(in srgb, var(--surface-muted) 90%, transparent));
 }
 
 .glow-pill {
