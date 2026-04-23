@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppNavbar } from "@/components/app-navbar";
 import { setStoredUser } from "@/lib/client-auth";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -21,7 +20,7 @@ export default function RegisterPage() {
       return;
     }
     setStoredUser(email);
-    const nextPath = searchParams.get("next");
+    const nextPath = new URLSearchParams(window.location.search).get("next");
     router.push(nextPath || "/dashboard");
   };
 
