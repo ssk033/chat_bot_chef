@@ -3,33 +3,39 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f4f4f5;
-  --foreground: #18181b;
-  --surface: #ffffff;
-  --surface-muted: #fafafa;
-  --border-subtle: rgba(24, 24, 27, 0.1);
-  --accent: #0f766e;
-  --accent-muted: rgba(15, 118, 110, 0.12);
-  --ring-focus: rgba(15, 118, 110, 0.22);
-  --user-bubble-bg: #18181b;
-  --user-bubble-fg: #fafafa;
-  --muted-text: #71717a;
-  --input-border-focus: #d4d4d8;
+  --background: #07080c;
+  --foreground: #f4f7fb;
+  --surface: #0d1119;
+  --surface-muted: #111827;
+  --border-subtle: rgba(148, 163, 184, 0.22);
+  --accent: #34d399;
+  --accent-muted: rgba(52, 211, 153, 0.2);
+  --ring-focus: rgba(74, 222, 128, 0.3);
+  --user-bubble-bg: #f4f7fb;
+  --user-bubble-fg: #0b1020;
+  --muted-text: #9ba3b4;
+  --input-border-focus: #1f2937;
+  --icon-green: #22c55e;
+  --icon-green-bright: #86efac;
+  --icon-green-soft: rgba(74, 222, 128, 0.26);
 }
 
 html.dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --surface: #121214;
-  --surface-muted: #18181b;
-  --border-subtle: rgba(250, 250, 250, 0.1);
-  --accent: #2dd4bf;
-  --accent-muted: rgba(45, 212, 191, 0.15);
-  --ring-focus: rgba(45, 212, 191, 0.22);
-  --user-bubble-bg: #e4e4e7;
-  --user-bubble-fg: #18181b;
-  --muted-text: #a1a1aa;
-  --input-border-focus: #52525b;
+  --background: #07080c;
+  --foreground: #f4f7fb;
+  --surface: #0d1119;
+  --surface-muted: #111827;
+  --border-subtle: rgba(148, 163, 184, 0.22);
+  --accent: #34d399;
+  --accent-muted: rgba(52, 211, 153, 0.2);
+  --ring-focus: rgba(74, 222, 128, 0.3);
+  --user-bubble-bg: #f4f7fb;
+  --user-bubble-fg: #0b1020;
+  --muted-text: #9ba3b4;
+  --input-border-focus: #1f2937;
+  --icon-green: #22c55e;
+  --icon-green-bright: #86efac;
+  --icon-green-soft: rgba(74, 222, 128, 0.26);
 }
 
 @theme inline {
@@ -43,4 +49,81 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.theme-panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, transparent), color-mix(in srgb, var(--surface-muted) 90%, transparent));
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 28px rgba(3, 6, 16, 0.34);
+}
+
+.theme-section {
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  background: linear-gradient(180deg, rgba(10, 15, 25, 0.82), rgba(9, 12, 19, 0.92));
+}
+
+.glow-pill {
+  border: 1px solid color-mix(in srgb, var(--icon-green) 24%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-muted) 88%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--icon-green) 20%, transparent) inset;
+}
+
+.chef-icon-badge {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(129, 250, 202, 0.34);
+  background:
+    radial-gradient(circle at 22% 20%, rgba(236, 253, 245, 0.28), transparent 58%),
+    linear-gradient(145deg, #34d399 0%, #2ec9a4 52%, #22c55e 100%);
+  box-shadow:
+    0 0 0 1px rgba(209, 250, 229, 0.2) inset,
+    0 6px 14px rgba(8, 19, 14, 0.22),
+    0 0 12px rgba(52, 211, 153, 0.18);
+}
+
+.chef-icon-badge::before {
+  content: "";
+  position: absolute;
+  inset: -40% -18%;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    color-mix(in srgb, white 68%, transparent) 48%,
+    transparent 64%
+  );
+  opacity: 0.12;
+  transform: translateX(-56%) rotate(12deg);
+  animation: logo-shine 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chef-icon-badge svg,
+.green-shine-icon {
+  position: relative;
+  z-index: 1;
+  color: #d1fae5;
+  filter:
+    drop-shadow(0 0 2px rgba(236, 253, 245, 0.32))
+    drop-shadow(0 0 6px rgba(74, 222, 128, 0.2));
+}
+
+@keyframes logo-shine {
+  0% {
+    transform: translateX(-62%) rotate(12deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.34;
+  }
+  44% {
+    transform: translateX(58%) rotate(12deg);
+    opacity: 0.12;
+  }
+  100% {
+    transform: translateX(58%) rotate(12deg);
+    opacity: 0;
+  }
 }

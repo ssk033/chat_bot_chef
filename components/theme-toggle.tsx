@@ -1,23 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { IconMoon, IconSun } from "@tabler/icons-react";
 
 const STORAGE_KEY = "chef-theme";
 
-function readThemeIsDark(): boolean {
+function readThemeIsDarkFromDom(): boolean {
   if (typeof document === "undefined") return false;
   return document.documentElement.classList.contains("dark");
 }
 
-export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
-  const [mounted, setMounted] = useState(false);
+function subscribeTheme(onChange: () => void) {
+  if (typeof document === "undefined") return () => {};
+  const el = document.documentElement;
+  const obs = new MutationObserver(() => onChange());
+  obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+  return () => obs.disconnect();
+}
 
-  useEffect(() => {
-    setMounted(true);
-    setIsDark(readThemeIsDark());
-  }, []);
+export function ThemeToggle() {
+  const isDark = useSyncExternalStore(
+    subscribeTheme,
+    readThemeIsDarkFromDom,
+    () => false
+  );
 
   const toggle = useCallback(() => {
     const next = !document.documentElement.classList.contains("dark");
@@ -27,7 +33,6 @@ export function ThemeToggle() {
     } catch {
       /* ignore */
     }
-    setIsDark(next);
   }, []);
 
   return (
@@ -38,9 +43,7 @@ export function ThemeToggle() {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Light mode" : "Dark mode"}
     >
-      {!mounted ? (
-        <span className="h-5 w-5 rounded-full bg-[var(--border-subtle)]" aria-hidden />
-      ) : isDark ? (
+      {isDark ? (
         <IconSun size={20} stroke={1.75} aria-hidden />
       ) : (
         <IconMoon size={20} stroke={1.75} aria-hidden />

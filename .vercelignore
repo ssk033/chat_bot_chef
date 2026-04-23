@@ -1,0 +1,8 @@
+# Keep upload small; do not ignore app/ (Next.js needs app/api routes)
+.pytest_cache
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+.venv
+venv
+*.ipynb

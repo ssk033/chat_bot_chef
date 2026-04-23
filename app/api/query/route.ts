@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Recipe } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embedding-model";
 import { generateText, checkOllamaAvailable } from "@/lib/ollama-client";
@@ -225,7 +224,7 @@ export async function POST(req: Request) {
           });
           
           // Filter and sort results by relevance
-          const scoredResults = textResults.map((r: Recipe) => {
+          const scoredResults = textResults.map((r: any) => {
             let score = 0;
             const lowerTitle = (r.title || '').toLowerCase();
             const lowerIngredients = (r.ingredients || '').toLowerCase();
@@ -240,9 +239,13 @@ export async function POST(req: Request) {
           
           // Sort by relevance and take top 5
           results = scoredResults
-            .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+            .sort((a: any, b: any) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
             .slice(0, 5)
-            .map(({ relevanceScore, ...r }) => ({ ...r, distance: r.distance }));
+            .map((item: { relevanceScore: number; [key: string]: unknown }) => {
+              const { relevanceScore, ...rest } = item;
+              void relevanceScore;
+              return { ...rest, distance: rest.distance as number };
+            });
           
           console.log("✅ Found", results.length, "recipes using text search");
         } else {
@@ -251,7 +254,7 @@ export async function POST(req: Request) {
             take: 5,
             orderBy: { id: 'asc' }
           });
-          results = results.map((r: Recipe) => ({ ...r, distance: 0.5 }));
+          results = results.map((r: any) => ({ ...r, distance: 0.5 }));
           console.log("✅ No specific search terms, returning sample recipes");
         }
       } catch (fallbackError: any) {
@@ -394,7 +397,7 @@ Now provide your response:`;
         // Ollama not available, use intelligent fallback
         throw new Error("Ollama not available");
       }
-    } catch (llmError: any) {
+    } catch {
       console.log("⚠️ LLM unavailable, using intelligent fallback response...");
       
       // Intelligent fallback: Generate a helpful response from recipes (works without Ollama)

@@ -16,7 +16,7 @@ export async function checkOllamaAvailable(): Promise<boolean> {
       signal: AbortSignal.timeout(3000), // 3 second timeout
     });
     return response.ok;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

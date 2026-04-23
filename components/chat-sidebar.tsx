@@ -48,6 +48,7 @@ export function ChatSidebar({
   onDeleteSession,
   onRenameUser,
 }: ChatSidebarProps) {
+  void onMobileOpen;
   const rail = collapsed;
 
   return (
