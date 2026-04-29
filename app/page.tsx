@@ -9,17 +9,20 @@ import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card";
 const features = [
   {
     title: "Ingredient Recognition",
-    text: "Upload your available ingredients and get meal ideas fast.",
+    text:
+      "Upload a photo or list of your ingredients and let the chef agent recognize what you have, suggest smart combinations, and surface recipes that actually match your kitchen.",
     icon: IconCamera,
   },
   {
     title: "Personalized Meal Plans",
-    text: "Generate plans tailored to preferences, allergies, and goals.",
+    text:
+      "Generate weekly meal plans tailored to your taste preferences, allergies, and nutrition goals, with balanced recipes and automatic variety so you never get bored.",
     icon: IconChefHat,
   },
   {
     title: "Nutrition Tracking",
-    text: "Track calories and macros with a clean daily workflow.",
+    text:
+      "Track calories, macros, and key nutrients in a clean daily view, so you can see exactly how each suggested meal fits into your targets and adjust in seconds.",
     icon: IconChartBar,
   },
 ];

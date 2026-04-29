@@ -428,7 +428,9 @@ export async function POST(req: Request) {
     }
 
     // Re-rank vector hits with lexical relevance and reject noisy matches.
-    const searchTerms = (mealPlanIngredients.length > 0 ? mealPlanIngredients : extractSearchTerms(message)).map(normalizeSearchToken);
+    const searchTerms: string[] = (
+      mealPlanIngredients.length > 0 ? mealPlanIngredients : extractSearchTerms(message)
+    ).map(normalizeSearchToken);
     if (results.length > 0 && searchTerms.length > 0) {
       const rescored = results
         .map((r: any) => ({
@@ -453,10 +455,14 @@ export async function POST(req: Request) {
 
     // Recovery query: broad lexical lookup when vector + strict rerank returns nothing.
     if (results.length === 0 && searchTerms.length > 0) {
-      const broadTerms = Array.from(
+      const broadTerms: string[] = Array.from(
         new Set(
-          searchTerms.flatMap((term) =>
-            term === "lamb" ? ["lamb", "mutton", "goat"] : term === "biryani" ? ["biryani", "biriyani"] : [term]
+          searchTerms.flatMap((term: string) =>
+            term === "lamb"
+              ? ["lamb", "mutton", "goat"]
+              : term === "biryani"
+                ? ["biryani", "biriyani"]
+                : [term]
           )
         )
       );
@@ -464,8 +470,8 @@ export async function POST(req: Request) {
       const broadMatches = await prisma.recipe.findMany({
         where: {
           OR: broadTerms.flatMap((term) => [
-            { title: { contains: term, mode: "insensitive" } },
-            { ingredients: { contains: term, mode: "insensitive" } },
+            { title: { contains: term, mode: "insensitive" as const } },
+            { ingredients: { contains: term, mode: "insensitive" as const } },
           ]),
         },
         take: 30,

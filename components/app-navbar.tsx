@@ -13,11 +13,7 @@ type AppNavbarProps = {
 
 export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setLoggedIn(Boolean(getStoredUser()));
-  }, []);
+  const [loggedIn, setLoggedIn] = useState(() => Boolean(getStoredUser()));
 
   const talkToChefHref = loggedIn ? "/chat-bot-chef" : "/auth/login?next=/chat-bot-chef";
 
