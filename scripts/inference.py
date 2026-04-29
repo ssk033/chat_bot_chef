@@ -10,8 +10,27 @@ import os
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
+def resolve_model_dir() -> Path:
+    """
+    Resolve model path from env override first, then known locations.
+    """
+    env_path = os.getenv("RECIPE_MODEL_DIR")
+    if env_path:
+        p = Path(env_path)
+        if p.exists():
+            return p
+
+    candidates = [
+        Path(__file__).parent.parent / "models" / "recipe-embedder",
+        Path(__file__).parent.parent / "RecipeModel" / "models" / "recipe-embedder",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
 # Get model directory
-MODEL_DIR = Path(__file__).parent.parent / "models" / "recipe-embedder"
+MODEL_DIR = resolve_model_dir()
 
 # Global model cache
 _model = None
@@ -21,7 +40,7 @@ def load_model():
     global _model
     if _model is None:
         if not MODEL_DIR.exists():
-            print(json.dumps({"error": f"Google Colab trained model not found at {MODEL_DIR}. Please ensure the model is placed in models/recipe-embedder/"}))
+            print(json.dumps({"error": f"Google Colab trained model not found at {MODEL_DIR}. Please ensure the model is placed in models/recipe-embedder/ or RecipeModel/models/recipe-embedder/"}))
             sys.exit(1)
         
         try:

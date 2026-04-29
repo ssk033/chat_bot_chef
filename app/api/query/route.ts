@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embedding-model";
-import { generateText, checkOllamaAvailable } from "@/lib/ollama-client";
 
 /**
  * Format instructions - handle JSON arrays or plain text
@@ -55,6 +54,62 @@ function sanitizePlainTextReply(text: string): string {
     .replace(/\[(.*?)\]/g, "$1")
     .replace(/"\s*,\s*"/g, ", ")
     .trim();
+}
+
+function extractSearchTerms(message: string): string[] {
+  return message
+    .toLowerCase()
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(
+      (term) =>
+        term.length > 2 &&
+        ![
+          "the",
+          "and",
+          "for",
+          "with",
+          "from",
+          "that",
+          "this",
+          "give",
+          "me",
+          "recipes",
+          "recipe",
+          "make",
+          "cook",
+          "please",
+        ].includes(term)
+    );
+}
+
+function lexicalRelevanceScore(recipe: any, searchTerms: string[]): number {
+  if (searchTerms.length === 0) return 0;
+  const title = String(recipe.title ?? "").toLowerCase();
+  const ingredients = String(recipe.ingredients ?? "").toLowerCase();
+  const instructions = String(recipe.instructions ?? "").toLowerCase();
+
+  let score = 0;
+  for (const term of searchTerms) {
+    if (title.includes(term)) score += 8;
+    if (ingredients.includes(term)) score += 12;
+    if (instructions.includes(term)) score += 2;
+  }
+  return score;
+}
+
+const CASUAL_CHAT_REGEX =
+  /^(hi|hello|hey|yo|sup|how are you|what's up|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)$/i;
+
+function isCasualConversation(message: string): boolean {
+  return CASUAL_CHAT_REGEX.test(message.trim());
+}
+
+function normalizeSearchToken(token: string): string {
+  const t = token.trim().toLowerCase();
+  if (t === "biriyani") return "biryani";
+  if (t === "mutton") return "lamb";
+  return t;
 }
 
 const COMMON_INGREDIENT_HINTS = [
@@ -203,12 +258,30 @@ export async function POST(req: Request) {
       });
     }
 
+    // Handle casual small-talk up front, so greetings feel chat-like.
+    if (isCasualConversation(message)) {
+      const responses: { [key: string]: string } = {
+        "hi": "Hey! I am your chef buddy. Tell me ingredients or dish name, and I will suggest the best recipes.",
+        "hello": "Hello! Ready to cook? Ask me any dish, cuisine, or ingredients you have.",
+        "hey": "Hey! What are you craving today?",
+        "yo": "Yo! Chef mode on. Tell me what you want to cook.",
+        "how are you": "Doing great and ready to cook with you. What should we make?",
+        "thanks": "Anytime! Want another recipe suggestion?",
+        "thank you": "You are welcome. Let's cook something awesome.",
+        "bye": "Bye! Happy cooking.",
+        "goodbye": "Goodbye! Come back for more recipes.",
+        "help": "I can help with:\n- dish-based recipes (e.g. mutton biryani)\n- ingredient-based recipes (e.g. rice onion tomato)\n- quick meal ideas by prep time",
+      };
+      const key = message.toLowerCase().trim();
+      return NextResponse.json({ reply: responses[key] ?? "Hey! Tell me what dish you want and I will find recipes for it." });
+    }
+
     console.log("📝 User query:", message);
 
     // Check if database has recipes
     const recipeCount = await prisma.recipe.count();
     const embeddingCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "embeddings"`) as any[];
-    const embeddingCountNum = embeddingCount[0]?.count || 0;
+    const embeddingCountNum = Number(embeddingCount[0]?.count ?? 0);
     
     console.log("📊 Total recipes in database:", recipeCount);
     console.log("📊 Total embeddings in database:", embeddingCountNum);
@@ -281,10 +354,7 @@ export async function POST(req: Request) {
       console.log("🔄 Using text-based search...");
       try {
         // Extract meaningful search terms from query
-        const searchTerms = (mealPlanIngredients.length > 0 ? mealPlanIngredients : message
-          .toLowerCase()
-          .split(/\s+/)
-          .filter((term: string) => term.length > 2 && !['the', 'and', 'for', 'with', 'from', 'that', 'this', 'give', 'me', 'recipes', 'recipe'].includes(term)));
+        const searchTerms = mealPlanIngredients.length > 0 ? mealPlanIngredients : extractSearchTerms(message);
         
         // Extract prep time filter if mentioned
         const prepTimeMatch = message.match(/(\d+)\s*(?:min|minute|mins)\s*(?:prep|preparation)/i);
@@ -325,15 +395,7 @@ export async function POST(req: Request) {
           
           // Filter and sort results by relevance
           const scoredResults = textResults.map((r: any) => {
-            let score = 0;
-            const lowerTitle = (r.title || '').toLowerCase();
-            const lowerIngredients = (r.ingredients || '').toLowerCase();
-            
-            searchTerms.forEach((term: string) => {
-              if (lowerIngredients.includes(term)) score += mealPlanIngredients.length > 0 ? 20 : 10;
-              if (lowerTitle.includes(term)) score += mealPlanIngredients.length > 0 ? 2 : 5;
-            });
-            
+            const score = lexicalRelevanceScore(r, searchTerms);
             return { ...r, distance: 1 - (score / 100), relevanceScore: score };
           });
           
@@ -365,6 +427,57 @@ export async function POST(req: Request) {
       }
     }
 
+    // Re-rank vector hits with lexical relevance and reject noisy matches.
+    const searchTerms = (mealPlanIngredients.length > 0 ? mealPlanIngredients : extractSearchTerms(message)).map(normalizeSearchToken);
+    if (results.length > 0 && searchTerms.length > 0) {
+      const rescored = results
+        .map((r: any) => ({
+          ...r,
+          relevanceScore: lexicalRelevanceScore(r, searchTerms),
+        }))
+        .sort((a: any, b: any) => {
+          if ((b.relevanceScore ?? 0) !== (a.relevanceScore ?? 0)) {
+            return (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0);
+          }
+          return (a.distance ?? 1) - (b.distance ?? 1);
+        });
+
+      const bestScore = rescored[0]?.relevanceScore ?? 0;
+      if (bestScore > 0) {
+        results = rescored.slice(0, 5);
+      } else {
+        // No lexical signal at all: avoid showing random vector neighbors.
+        results = [];
+      }
+    }
+
+    // Recovery query: broad lexical lookup when vector + strict rerank returns nothing.
+    if (results.length === 0 && searchTerms.length > 0) {
+      const broadTerms = Array.from(
+        new Set(
+          searchTerms.flatMap((term) =>
+            term === "lamb" ? ["lamb", "mutton", "goat"] : term === "biryani" ? ["biryani", "biriyani"] : [term]
+          )
+        )
+      );
+
+      const broadMatches = await prisma.recipe.findMany({
+        where: {
+          OR: broadTerms.flatMap((term) => [
+            { title: { contains: term, mode: "insensitive" } },
+            { ingredients: { contains: term, mode: "insensitive" } },
+          ]),
+        },
+        take: 30,
+      });
+
+      results = broadMatches
+        .map((r: any) => ({ ...r, relevanceScore: lexicalRelevanceScore(r, broadTerms), distance: 0.8 }))
+        .filter((r: any) => (r.relevanceScore ?? 0) > 0)
+        .sort((a: any, b: any) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+        .slice(0, 5);
+    }
+
     console.log("✅ Found", results.length, "matching recipes");
 
     // Check if this is a general question (not recipe-related)
@@ -377,29 +490,6 @@ export async function POST(req: Request) {
     // If it's a general question, skip recipe search and go directly to LLM
     if (isGeneralQuestion && results.length === 0) {
       console.log("💬 Detected general question, skipping recipe search");
-      
-      const generalPrompt = `You are a friendly and helpful AI chef assistant. You can help with cooking questions, recipe suggestions, and general conversation.
-
-CURRENT USER MESSAGE: ${message}
-
-Provide a friendly, helpful response that:
-- If the user is greeting you, greet them back warmly
-- If they're asking for help, offer assistance
-- Keep responses concise and natural
-- Use ONLY plain text - NO markdown formatting
-
-Your response:`;
-
-      try {
-        const ollamaAvailable = await checkOllamaAvailable();
-        if (ollamaAvailable) {
-          const reply = await generateText(generalPrompt);
-          return NextResponse.json({ reply });
-        }
-        // If Ollama not available, fall through to fallback responses below
-      } catch {
-        // Fall through to fallback
-      }
       
       // Fallback response for general questions (works without Ollama)
       const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
@@ -461,77 +551,44 @@ Cuisine: ${r.cuisine || "Not specified"}
 `;
     }
 
-    // 3️⃣ Generate response - try Ollama first, fallback to intelligent response
-    const countInstruction = requestedCount ? ` The user specifically requested ${requestedCount} recipe${requestedCount > 1 ? 's' : ''}, so focus on providing exactly that many.` : '';
-    
-    const prompt = `You are a professional chef AI assistant. Your job is to help users find recipes and answer cooking questions.
-
-CURRENT USER QUERY: "${message}"
-${countInstruction}
-
-AVAILABLE RECIPES FROM DATABASE:
-${context}
-
-INSTRUCTIONS:
-1. Answer the user's CURRENT query: "${message}"
-2. ${requestedCount ? `Provide exactly ${requestedCount} recipe${requestedCount > 1 ? 's' : ''} as requested` : 'Recommend the best matching recipe(s) from the database above'}
-3. Provide a clear, helpful response based ONLY on the current query
-4. Explain why the recipe(s) fit the user's needs
-5. Provide clear step-by-step instructions when relevant
-6. Use ONLY plain text - NO markdown, NO asterisks, NO special formatting
-7. Write naturally for both reading and text-to-speech
-8. DO NOT reference previous conversations or history - treat each query as fresh
-
-Now provide your response:`;
-
-    console.log("🤖 Generating response...");
+    // 3️⃣ Generate response from retrieved recipes
+    void context;
+    console.log("🤖 Generating recipe response...");
     let reply: string;
     
     try {
-      // Try Ollama first (if available)
-      const ollamaAvailable = await checkOllamaAvailable();
-      if (ollamaAvailable) {
-        reply = sanitizePlainTextReply(await generateText(prompt));
-        console.log("✅ Response generated successfully using Ollama LLM");
-      } else {
-        // Ollama not available, use intelligent fallback
-        throw new Error("Ollama not available");
-      }
+      reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
+      reply = sanitizePlainTextReply(reply);
+      console.log("✅ Generated intelligent recipe response");
     } catch {
-      console.log("⚠️ LLM unavailable, using intelligent fallback response...");
+      console.log("⚠️ Primary recipe response failed, using basic listing fallback...");
+      // Final fallback: Return recipes directly without AI enhancement
+      console.log("⚠️ Using basic recipe listing fallback...");
       
-      // Intelligent fallback: Generate a helpful response from recipes (works without Ollama)
-      try {
-        reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
-        console.log("✅ Generated intelligent fallback response");
-      } catch {
-        // Final fallback: Return recipes directly without AI enhancement
-        console.log("⚠️ Using basic recipe listing fallback...");
+      // Check if it's a general question for fallback
+      const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
+    
+      if (isGeneralQuestionFallback) {
+        const responses: { [key: string]: string } = {
+          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
+          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
+          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
+          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
+          "thank you": "You're very welcome! Happy cooking!",
+          "bye": "Goodbye! Happy cooking!",
+          "goodbye": "See you later! Enjoy your cooking!",
+          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+        };
         
-        // Check if it's a general question for fallback
-        const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
-      
-        if (isGeneralQuestionFallback) {
-          const responses: { [key: string]: string } = {
-            "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
-            "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
-            "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
-            "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
-            "thank you": "You're very welcome! Happy cooking!",
-            "bye": "Goodbye! Happy cooking!",
-            "goodbye": "See you later! Enjoy your cooking!",
-            "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
-          };
-          
-          const lowerMessage = message.toLowerCase().trim();
-          reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
-          
-          return NextResponse.json({ reply, llmUnavailable: true });
-        }
-      
-        // Use the already-declared requestedCount and uniqueResults from outer scope
-        // No need to redeclare them
-      
+        const lowerMessage = message.toLowerCase().trim();
+        reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
+        
+        return NextResponse.json({ reply });
+      }
+    
+      // Use the already-declared requestedCount and uniqueResults from outer scope
+      // No need to redeclare them
+    
       // Limit to requested number or default to 3
       const limit = requestedCount && requestedCount > 0 ? requestedCount : 3;
       const finalResults = uniqueResults.slice(0, limit);
@@ -565,8 +622,6 @@ Now provide your response:`;
         reply += `\n`;
       });
       
-      reply += `\nNote: Enhanced AI responses are currently unavailable, but I've found these great recipes for you!`;
-      
       return NextResponse.json({
         reply,
         sources: finalResults.map((r: any) => ({
@@ -575,9 +630,7 @@ Now provide your response:`;
           cookTime: r.cookTime,
           distance: r.distance
         })),
-        llmUnavailable: true
       });
-      }
     }
 
     return NextResponse.json({

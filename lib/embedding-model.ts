@@ -7,8 +7,19 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-const MODEL_DIR = path.join(process.cwd(), 'models', 'recipe-embedder');
 const INFERENCE_SCRIPT = path.join(process.cwd(), 'scripts', 'inference.py');
+
+const MODEL_DIR_CANDIDATES = [
+  path.join(process.cwd(), 'models', 'recipe-embedder'),
+  path.join(process.cwd(), 'RecipeModel', 'models', 'recipe-embedder'),
+];
+
+function resolveModelDir(): string | null {
+  for (const candidate of MODEL_DIR_CANDIDATES) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 // Hugging Face Inference API endpoints (free, no API key needed for public models)
 // Using multiple models as fallback options
@@ -19,7 +30,7 @@ const HUGGINGFACE_MODELS = [
 ];
 
 function getHuggingFaceUrl(model: string): string {
-  return `https://api-inference.huggingface.co/models/${model}`;
+  return `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`;
 }
 
 /**
@@ -30,7 +41,7 @@ export function isModelAvailable(): boolean {
   if (process.env.VERCEL === '1' || process.env.NEXT_PUBLIC_VERCEL === '1') {
     return false;
   }
-  return fs.existsSync(MODEL_DIR) && fs.existsSync(INFERENCE_SCRIPT);
+  return resolveModelDir() !== null && fs.existsSync(INFERENCE_SCRIPT);
 }
 
 /**
@@ -95,6 +106,9 @@ async function generateEmbeddingWithHuggingFace(text: string): Promise<number[]>
       }
 
       const data = await response.json();
+      if (data?.error) {
+        throw new Error(`Hugging Face API error: ${String(data.error)}`);
+      }
       
       // Handle different response formats
       let embedding: number[];
@@ -134,7 +148,13 @@ async function generateEmbeddingWithHuggingFace(text: string): Promise<number[]>
  */
 async function generateEmbeddingLocal(text: string): Promise<number[]> {
   return new Promise((resolve, reject) => {
-    const python = spawn('python3', [INFERENCE_SCRIPT, text]);
+    const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+    const python = spawn(pythonCommand, [INFERENCE_SCRIPT, text], {
+      env: {
+        ...process.env,
+        RECIPE_MODEL_DIR: resolveModelDir() ?? "",
+      },
+    });
 
     let stdout = '';
     let stderr = '';
@@ -208,9 +228,10 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
  * Get model information.
  */
 export function getModelInfo(): { path: string; available: boolean } {
+  const resolvedModel = resolveModelDir();
   return {
-    path: MODEL_DIR,
-    available: isModelAvailable(),
+    path: resolvedModel ?? MODEL_DIR_CANDIDATES[0],
+    available: resolvedModel !== null && isModelAvailable(),
   };
 }
 

@@ -17,14 +17,19 @@ async function main() {
   console.log("   MAX_RECIPES_TO_LOAD=5000 npm run load  (loads 5k recipes)");
   console.log("   MAX_RECIPES_TO_LOAD=10000 npm run load (loads 10k recipes)\n");
 
-  // Try recipes_data.csv first (your large dataset), fallback to recipes.csv
-  const filePath = fs.existsSync(path.join(process.cwd(), "recipes_data.csv"))
-    ? path.join(process.cwd(), "recipes_data.csv")
-    : path.join(process.cwd(), "recipes.csv");
+  // Try known dataset locations in priority order.
+  const datasetCandidates = [
+    path.join(process.cwd(), "dataset", "recipes_data.csv"),
+    path.join(process.cwd(), "recipes_data.csv"),
+    path.join(process.cwd(), "dataset", "recipes.csv"),
+    path.join(process.cwd(), "recipes.csv"),
+  ];
+  const filePath = datasetCandidates.find((p) => fs.existsSync(p));
 
-  if (!fs.existsSync(filePath)) {
+  if (!filePath) {
     console.error("❌ Recipe CSV not found in project root.");
-    console.error("   Tried: recipes_data.csv and recipes.csv");
+    console.error("   Tried:");
+    datasetCandidates.forEach((candidate) => console.error(`   - ${candidate}`));
     process.exit(1);
   }
   
@@ -121,16 +126,21 @@ async function loadWithStreaming(filePath: string) {
     
     // Memory-efficient batch processing
     const BATCH_SIZE = 10; // Process 10 recipes at a time
-    const MAX_RECIPES = process.env.MAX_RECIPES_TO_LOAD 
-      ? parseInt(process.env.MAX_RECIPES_TO_LOAD) 
-      : 10000; // Default: load 10k recipes (adjust as needed)
+    const parsedLimit = process.env.MAX_RECIPES_TO_LOAD
+      ? parseInt(process.env.MAX_RECIPES_TO_LOAD, 10)
+      : Number.NaN;
+    const MAX_RECIPES = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : Number.POSITIVE_INFINITY;
     
     let batchQueue: any[] = [];
     let isProcessing = false;
     
     console.log("📖 Starting to stream CSV file...");
     console.log(`⚙️  Batch size: ${BATCH_SIZE} recipes`);
-    console.log(`⚙️  Max recipes to load: ${MAX_RECIPES} (set MAX_RECIPES_TO_LOAD env var to change)`);
+    console.log(
+      `⚙️  Max recipes to load: ${
+        Number.isFinite(MAX_RECIPES) ? MAX_RECIPES : "ALL"
+      } (set MAX_RECIPES_TO_LOAD env var to limit)`
+    );
     
     const fileStream = createReadStream(filePath, { encoding: "utf8" });
     
@@ -231,8 +241,8 @@ Instructions: ${recipe.instructions}
         rowCount++;
         const r = result.data as any;
         
-        // Stop if we've read enough
-        if (rowCount > MAX_RECIPES * 2) {
+        // Stop reading early only when a finite max is configured
+        if (Number.isFinite(MAX_RECIPES) && rowCount > MAX_RECIPES * 2) {
           shouldStop = true;
           p.abort();
           return;

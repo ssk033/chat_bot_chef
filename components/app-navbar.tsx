@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconChefHat } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -13,7 +13,11 @@ type AppNavbarProps = {
 
 export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(() => Boolean(getStoredUser()));
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setLoggedIn(Boolean(getStoredUser()));
+  }, []);
 
   const talkToChefHref = loggedIn ? "/chat-bot-chef" : "/auth/login?next=/chat-bot-chef";
 
@@ -51,7 +55,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
               </Link>
               <Link
                 href="/auth/register"
-                className="rounded-lg bg-[var(--user-bubble-bg)] px-3 py-2 text-sm font-medium text-[var(--user-bubble-fg)] shadow hover:opacity-90"
+                className="btn-solid rounded-lg bg-[var(--user-bubble-bg)] px-3 py-2 text-sm font-medium text-[var(--user-bubble-fg)] shadow"
               >
                 Get Started
               </Link>
@@ -68,7 +72,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-lg bg-[var(--user-bubble-bg)] px-3 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90"
+                className="btn-solid rounded-lg bg-[var(--user-bubble-bg)] px-3 py-2 text-sm font-medium text-[var(--user-bubble-fg)]"
               >
                 Logout
               </button>

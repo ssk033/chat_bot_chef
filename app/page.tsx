@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { IconArrowRight, IconCamera, IconChefHat, IconChartBar, IconToolsKitchen2 } from "@tabler/icons-react";
 import { AppNavbar } from "@/components/app-navbar";
+import { CardBody, CardContainer, CardItem } from "@/components/ui/3d-card";
 
 const features = [
   {
@@ -38,8 +41,10 @@ export default function HomePage() {
             </div>
 
             <div className="text-center">
-              <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl">Create a Meal Plan</h1>
-              <p className="mt-2 text-4xl font-extrabold tracking-tight text-[var(--foreground)]/15 sm:text-5xl">
+              <h1 className="text-5xl font-bold tracking-tight text-[var(--foreground)] sm:text-6xl dark:text-white">
+                Create a Meal Plan
+              </h1>
+              <p className="mt-2 text-4xl font-extrabold tracking-tight text-[var(--accent)]/85 sm:text-5xl">
                 Tailored For You
               </p>
               <p className="mx-auto mt-6 max-w-xl text-base text-[var(--muted-text)] sm:text-lg">
@@ -48,7 +53,7 @@ export default function HomePage() {
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href="/auth/register"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--user-bubble-bg)] px-6 py-3 text-base font-medium text-[var(--user-bubble-fg)] shadow hover:opacity-90"
+                  className="btn-solid inline-flex items-center gap-2 rounded-xl bg-[var(--user-bubble-bg)] px-6 py-3 text-base font-medium text-[var(--user-bubble-fg)] shadow"
                 >
                   Get Started
                   <IconArrowRight size={18} />
@@ -76,19 +81,36 @@ export default function HomePage() {
               Discover how our meal planner can transform your cooking and eating experience.
             </p>
             <div className="grid gap-6 md:grid-cols-3">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="theme-panel rounded-2xl p-6"
-              >
-                <div className="chef-icon-badge mb-4 flex h-12 w-12 items-center justify-center rounded-xl">
-                  <f.icon size={22} className="green-shine-icon" />
-                </div>
-                <h3 className="mb-2 text-lg font-semibold">{f.title}</h3>
-                <p className="text-sm text-[var(--muted-text)]">{f.text}</p>
-              </div>
-            ))}
-          </div>
+              {features.map((f) => (
+                <CardContainer
+                  key={f.title}
+                  containerClassName="py-0"
+                  className="w-full"
+                >
+                  <CardBody className="theme-panel group/card h-full w-full rounded-2xl p-6">
+                    <CardItem translateZ={50}>
+                      <div className="chef-icon-badge mb-4 flex h-12 w-12 items-center justify-center rounded-xl">
+                        <f.icon size={22} className="green-shine-icon" />
+                      </div>
+                    </CardItem>
+                    <CardItem
+                      as="h3"
+                      translateZ={70}
+                      className="mb-2 text-lg font-semibold"
+                    >
+                      {f.title}
+                    </CardItem>
+                    <CardItem
+                      as="p"
+                      translateZ={60}
+                      className="text-sm text-[var(--muted-text)]"
+                    >
+                      {f.text}
+                    </CardItem>
+                  </CardBody>
+                </CardContainer>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -99,18 +121,32 @@ export default function HomePage() {
           </p>
           <div className="grid gap-6 md:grid-cols-3">
             {["Add Your Ingredients", "Set Your Preferences", "Get Your Meal Plan"].map((step, index) => (
-              <div key={step} className="theme-panel rounded-2xl p-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg font-bold text-[#0f172a]">
-                  {index + 1}
-                </div>
-                <h3 className="text-lg font-semibold">{step}</h3>
-              </div>
+              <CardContainer
+                key={step}
+                containerClassName="py-0"
+                className="w-full"
+              >
+                <CardBody className="theme-panel group/card h-full w-full rounded-2xl p-6 text-center">
+                  <CardItem translateZ={55} className="mx-auto mb-4">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface)] text-lg font-bold text-[var(--foreground)]">
+                      {index + 1}
+                    </div>
+                  </CardItem>
+                  <CardItem
+                    as="h3"
+                    translateZ={70}
+                    className="mx-auto text-lg font-semibold"
+                  >
+                    {step}
+                  </CardItem>
+                </CardBody>
+              </CardContainer>
             ))}
           </div>
           <div className="mt-10 text-center">
             <Link
               href="/meal-plan/create"
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--user-bubble-bg)] px-6 py-3 text-base font-medium text-[var(--user-bubble-fg)] shadow"
+              className="btn-solid inline-flex items-center gap-2 rounded-xl bg-[var(--user-bubble-bg)] px-6 py-3 text-base font-medium text-[var(--user-bubble-fg)] shadow"
             >
               Start Meal Planning
               <IconToolsKitchen2 size={18} className="green-shine-icon" />

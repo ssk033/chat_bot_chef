@@ -481,7 +481,7 @@ export default function ChatBotChefPage() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div className="h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -497,8 +497,12 @@ export default function ChatBotChefPage() {
         onRenameUser={handleRenameUser}
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface)]/90 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/75">
+      <div className={`flex h-full min-w-0 flex-1 flex-col ${sidebarCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"}`}>
+        <header
+          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface)]/90 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/75 ${
+            sidebarCollapsed ? "md:left-[72px]" : "md:left-[260px]"
+          } left-0`}
+        >
           <div className="flex w-full flex-wrap items-center gap-3 px-3 py-3 sm:px-5 lg:px-6 xl:px-8">
             <button
               type="button"
@@ -550,13 +554,13 @@ export default function ChatBotChefPage() {
           </div>
         ) : null}
 
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-3 py-4 sm:px-5 sm:py-5 lg:px-6 xl:max-w-4xl xl:px-8 min-h-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <main className="mx-auto flex h-full w-full max-w-5xl flex-1 flex-col px-3 pt-20 sm:px-5 lg:px-6 xl:px-8 min-h-0">
           <section
             className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] shadow-sm"
             aria-label="Conversation"
           >
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:px-5 sm:py-5">
+              <div className="chat-scroll-area min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:px-5 sm:py-5">
                 {messages.length === 0 ? (
                   <div className="flex min-h-[min(50dvh,20rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[280px]">
                     <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-muted)] text-[var(--muted-text)] ring-1 ring-[var(--border-subtle)] sm:h-16 sm:w-16">
@@ -574,12 +578,12 @@ export default function ChatBotChefPage() {
                     {messages.map((m, i) => (
                       <div
                         key={i}
-                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                        className={`message-enter flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[min(100%,36rem)] rounded-2xl px-3.5 py-3 text-sm leading-relaxed sm:px-4 sm:text-[15px] sm:leading-relaxed ${
+                          className={`max-w-[min(100%,46rem)] rounded-2xl px-3.5 py-3 text-sm leading-relaxed sm:px-4 sm:text-[15px] sm:leading-relaxed ${
                             m.role === "user"
-                              ? "bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)]"
+                              ? "bg-[var(--icon-green)] text-[#052e16]"
                               : "bg-[var(--surface-muted)] text-[var(--foreground)] ring-1 ring-[var(--border-subtle)]"
                           }`}
                         >
@@ -591,10 +595,11 @@ export default function ChatBotChefPage() {
                       </div>
                     ))}
                     {isLoading && (
-                      <div className="flex justify-start">
+                      <div className="message-enter flex justify-start">
                         <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface-muted)] px-3.5 py-3 text-sm text-[var(--muted-text)] ring-1 ring-[var(--border-subtle)] sm:px-4">
-                          <IconLoader2 size={18} className="shrink-0 animate-spin" aria-hidden />
-                          <span>Thinking...</span>
+                          <span className="typing-dot" />
+                          <span className="typing-dot [animation-delay:0.2s]" />
+                          <span className="typing-dot [animation-delay:0.4s]" />
                         </div>
                       </div>
                     )}
@@ -606,7 +611,7 @@ export default function ChatBotChefPage() {
           </section>
 
           <section
-            className="shrink-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3 shadow-sm sm:p-4"
+            className="sticky bottom-0 mt-4 shrink-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/95 p-3 shadow-sm backdrop-blur sm:p-4"
             aria-label="Message composer"
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-3">
