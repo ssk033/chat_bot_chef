@@ -25,15 +25,26 @@ export const CardContainer = ({
   containerClassName?: string;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<number | null>(null);
+  const pendingTransformRef = useRef<{ x: number; y: number } | null>(null);
   const [isMouseEntered, setIsMouseEntered] = useState(false);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
     const { left, top, width, height } =
       containerRef.current.getBoundingClientRect();
     const x = (e.clientX - left - width / 2) / 25;
     const y = (e.clientY - top - height / 2) / 25;
-    containerRef.current.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+    pendingTransformRef.current = { x, y };
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      if (containerRef.current && pendingTransformRef.current) {
+        const { x: nx, y: ny } = pendingTransformRef.current;
+        containerRef.current.style.transform = `rotateY(${nx}deg) rotateX(${ny}deg)`;
+      }
+      frameRef.current = null;
+    });
   };
 
   const handleMouseEnter = () => {
@@ -46,6 +57,13 @@ export const CardContainer = ({
     setIsMouseEntered(false);
     containerRef.current.style.transform = `rotateY(0deg) rotateX(0deg)`;
   };
+  useEffect(() => {
+    return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, []);
   return (
     <MouseEnterContext.Provider value={[isMouseEntered, setIsMouseEntered]}>
       <div

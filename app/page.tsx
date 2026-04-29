@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import { IconArrowRight, IconCamera, IconChefHat, IconChartBar, IconToolsKitchen2 } from "@tabler/icons-react";
@@ -39,8 +37,8 @@ export default function HomePage() {
           </div>
           <div className="mx-auto grid w-full max-w-6xl items-center gap-8 md:grid-cols-[1fr_1.4fr_1fr]">
             <div className="hidden flex-col items-center gap-8 md:flex">
-              <Image src="/beef.png" alt="Beef" width={170} height={120} className="object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
-              <Image src="/chicken.png" alt="Chicken" width={170} height={120} className="object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
+              <Image src="/beef.png" alt="Beef" width={170} height={120} sizes="170px" className="h-auto object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
+              <Image src="/chicken.png" alt="Chicken" width={170} height={120} sizes="170px" className="h-auto object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
             </div>
 
             <div className="text-center">
@@ -71,8 +69,8 @@ export default function HomePage() {
             </div>
 
             <div className="hidden flex-col items-center gap-8 md:flex">
-              <Image src="/vegetables.png" alt="Vegetables" width={170} height={120} className="object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
-              <Image src="/fruits.png" alt="Fruits" width={170} height={120} className="object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
+              <Image src="/vegetables.png" alt="Vegetables" width={170} height={120} sizes="170px" priority className="h-auto object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
+              <Image src="/fruits.png" alt="Fruits" width={170} height={120} sizes="170px" className="h-auto object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.45)]" />
             </div>
           </div>
         </section>
@@ -154,7 +152,7 @@ export default function HomePage() {
               Start Meal Planning
               <IconToolsKitchen2 size={18} className="green-shine-icon" />
             </Link>
-            <p className="mt-4 text-sm text-[var(--muted-text)]">Meal-IT!! - made by Sanidhya Singh</p>
+            <p className="mt-4 text-sm text-[var(--muted-text)]">Meal-IT!! - made by Sanidhya, Rajnish, Sachet, Aayush</p>
           </div>
         </section>
       </main>

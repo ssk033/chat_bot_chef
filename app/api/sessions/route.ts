@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
 export async function GET(req: Request) {
@@ -9,17 +9,22 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing anonymous key header" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { anonymousKey } });
-    if (!user) {
+    const user = await withPrismaReconnect(() =>
+      prisma.user.findUnique({
+        where: { anonymousKey },
+        select: { id: true },
+      })
+    );
+    if (!user?.id) {
       return NextResponse.json({ sessions: [] });
     }
 
-    const sessions = await prisma.chatSession.findMany({
+    const sessions = await withPrismaReconnect(() => prisma.chatSession.findMany({
       where: { userId: user.id },
       orderBy: { updatedAt: "desc" },
       select: { id: true, title: true, updatedAt: true, createdAt: true },
       take: 80,
-    });
+    }));
 
     return NextResponse.json({ sessions });
   } catch (e: unknown) {
@@ -36,8 +41,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing anonymous key header" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { anonymousKey } });
-    if (!user) {
+    const user = await withPrismaReconnect(() =>
+      prisma.user.findUnique({
+        where: { anonymousKey },
+        select: { id: true },
+      })
+    );
+    if (!user?.id) {
       return NextResponse.json({ error: "User not found; call bootstrap first" }, { status: 404 });
     }
 
@@ -47,10 +57,10 @@ export async function POST(req: Request) {
         ? body.title.trim().slice(0, 120)
         : "New chat";
 
-    const session = await prisma.chatSession.create({
+    const session = await withPrismaReconnect(() => prisma.chatSession.create({
       data: { userId: user.id, title },
       select: { id: true, title: true, updatedAt: true },
-    });
+    }));
 
     return NextResponse.json({ session });
   } catch (e: unknown) {

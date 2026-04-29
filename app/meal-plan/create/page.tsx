@@ -39,17 +39,26 @@ export default function CreateMealPlanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div
+      className="relative min-h-screen bg-[var(--background)] bg-cover bg-center bg-no-repeat text-[var(--foreground)]"
+      style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-black/30 dark:bg-black/50" />
       <AppNavbar />
-      <main className="mx-auto w-full max-w-3xl px-4 py-10">
-        <h1 className="mb-6 text-3xl font-bold">Create Meal Plan</h1>
+      <main className="relative z-10 mx-auto w-full max-w-3xl px-4 py-10">
+        <div className="theme-panel mb-6 rounded-2xl p-5">
+          <h1 className="text-3xl font-bold">Create Meal Plan</h1>
+          <p className="mt-1 text-sm text-[var(--muted-text)]">
+            Match your dashboard and homepage theme while planning meals.
+          </p>
+        </div>
 
-        <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-6">
+        <div className="theme-panel space-y-4 rounded-2xl p-6">
           <label className="block text-sm font-medium">Ingredients (comma separated)</label>
           <textarea
             value={ingredientsInput}
             onChange={(e) => setIngredientsInput(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             rows={4}
             placeholder="chicken, rice, tomato, onion"
           />
@@ -58,7 +67,7 @@ export default function CreateMealPlanPage() {
           <input
             value={dietaryInput}
             onChange={(e) => setDietaryInput(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             placeholder="high-protein, vegetarian, etc."
           />
 
@@ -66,7 +75,7 @@ export default function CreateMealPlanPage() {
           <input
             value={allergiesInput}
             onChange={(e) => setAllergiesInput(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             placeholder="peanuts, dairy, shellfish"
           />
 
@@ -76,13 +85,13 @@ export default function CreateMealPlanPage() {
             min={20}
             value={proteinTarget}
             onChange={(e) => setProteinTarget(Number(e.target.value))}
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
           />
 
           <button
             onClick={submit}
             disabled={ingredientList.length === 0}
-            className="rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] disabled:opacity-40"
+            className="btn-solid rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90 disabled:opacity-40"
           >
             Generate Meal Plan
           </button>

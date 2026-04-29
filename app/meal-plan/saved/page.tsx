@@ -21,10 +21,19 @@ export default function SavedMealPlansPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div
+      className="relative min-h-screen bg-[var(--background)] bg-cover bg-center bg-no-repeat text-[var(--foreground)]"
+      style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-black/30 dark:bg-black/50" />
       <AppNavbar />
-      <main className="mx-auto w-full max-w-5xl px-4 py-10">
-        <h1 className="mb-6 text-3xl font-bold">Saved Meal Plans</h1>
+      <main className="relative z-10 mx-auto w-full max-w-5xl px-4 py-10">
+        <div className="theme-panel mb-6 rounded-2xl p-5">
+          <h1 className="text-3xl font-bold">Saved Meal Plans</h1>
+          <p className="mt-1 text-sm text-[var(--muted-text)]">
+            Review and manage your saved plans with the same main-theme style.
+          </p>
+        </div>
 
         {plans.length === 0 ? (
           <p className="text-[var(--muted-text)]">No saved plans yet.</p>
@@ -33,13 +42,13 @@ export default function SavedMealPlansPage() {
             {plans.map((plan) => (
               <article
                 key={plan.id}
-                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5"
+                className="theme-panel rounded-2xl p-5"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold">{plan.name}</h2>
                   <button
                     onClick={() => remove(plan.id)}
-                    className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs hover:bg-[var(--surface-muted)]"
+                    className="glow-pill rounded-md px-2 py-1 text-xs hover:bg-[var(--surface-muted)]"
                   >
                     Delete
                   </button>

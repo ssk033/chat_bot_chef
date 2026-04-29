@@ -25,9 +25,16 @@ function resolveModelDir(): string | null {
 // Using multiple models as fallback options
 const HUGGINGFACE_MODELS = [
   'sentence-transformers/all-MiniLM-L6-v2', // 384 dims
-  'sentence-transformers/all-mpnet-base-v2', // 768 dims (more accurate)
   'sentence-transformers/paraphrase-MiniLM-L6-v2', // 384 dims
 ];
+
+const EMBEDDING_CACHE_TTL_MS = 5 * 60 * 1000;
+const EMBEDDING_CACHE_MAX_ITEMS = 300;
+const HF_TIMEOUT_MS = 3500;
+const PYTHON_TIMEOUT_MS = 8000;
+
+const embeddingCache = new Map<string, { value: number[]; expiresAt: number }>();
+const inFlightEmbeddings = new Map<string, Promise<number[]>>();
 
 function getHuggingFaceUrl(model: string): string {
   return `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`;
@@ -56,25 +63,32 @@ async function generateEmbeddingWithHuggingFace(text: string): Promise<number[]>
     try {
       const apiUrl = getHuggingFaceUrl(model);
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), HF_TIMEOUT_MS);
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ inputs: text }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         // If model is loading (503), wait and retry once
         if (response.status === 503) {
-          console.log(`Model ${model} is loading, waiting 5 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), HF_TIMEOUT_MS);
           const retryResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ inputs: text }),
+            signal: retryController.signal,
           });
+          clearTimeout(retryTimeoutId);
           
           if (!retryResponse.ok) {
             // If still failing, try next model
@@ -158,6 +172,10 @@ async function generateEmbeddingLocal(text: string): Promise<number[]> {
 
     let stdout = '';
     let stderr = '';
+    const timeoutId = setTimeout(() => {
+      python.kill();
+      reject(new Error("Python inference timed out"));
+    }, PYTHON_TIMEOUT_MS);
 
     python.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -168,6 +186,7 @@ async function generateEmbeddingLocal(text: string): Promise<number[]> {
     });
 
     python.on('close', (code) => {
+      clearTimeout(timeoutId);
       if (code !== 0) {
         reject(new Error(`Python inference failed: ${stderr || 'Unknown error'}`));
         return;
@@ -186,9 +205,31 @@ async function generateEmbeddingLocal(text: string): Promise<number[]> {
     });
 
     python.on('error', (error) => {
+      clearTimeout(timeoutId);
       reject(new Error(`Failed to start Python process: ${error.message}`));
     });
   });
+}
+
+function normalizeEmbeddingText(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, " ").slice(0, 800);
+}
+
+function getCachedEmbedding(cacheKey: string): number[] | null {
+  const entry = embeddingCache.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    embeddingCache.delete(cacheKey);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCachedEmbedding(cacheKey: string, value: number[]) {
+  embeddingCache.set(cacheKey, { value, expiresAt: Date.now() + EMBEDDING_CACHE_TTL_MS });
+  if (embeddingCache.size <= EMBEDDING_CACHE_MAX_ITEMS) return;
+  const firstKey = embeddingCache.keys().next().value as string | undefined;
+  if (firstKey) embeddingCache.delete(firstKey);
 }
 
 /**
@@ -198,18 +239,40 @@ async function generateEmbeddingLocal(text: string): Promise<number[]> {
  * @returns Embedding vector as an array of numbers
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  // Try local model first (for development)
-  if (isModelAvailable()) {
-    try {
-      return await generateEmbeddingLocal(text);
-    } catch (error: any) {
-      console.warn('Local model failed, falling back to Hugging Face API:', error.message);
-      // Fall through to use Hugging Face API
-    }
+  const cacheKey = normalizeEmbeddingText(text);
+  const cached = getCachedEmbedding(cacheKey);
+  if (cached) {
+    return cached;
   }
 
-  // Use Hugging Face API (works on Vercel and as fallback)
-  return await generateEmbeddingWithHuggingFace(text);
+  const inFlight = inFlightEmbeddings.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const run = (async () => {
+  // Try local model first (for development)
+    if (isModelAvailable()) {
+      try {
+        const embedding = await generateEmbeddingLocal(text);
+        setCachedEmbedding(cacheKey, embedding);
+        return embedding;
+      } catch (error: any) {
+        console.warn('Local model failed, falling back to Hugging Face API:', error.message);
+      }
+    }
+
+    const embedding = await generateEmbeddingWithHuggingFace(text);
+    setCachedEmbedding(cacheKey, embedding);
+    return embedding;
+  })();
+
+  inFlightEmbeddings.set(cacheKey, run);
+  try {
+    return await run;
+  } finally {
+    inFlightEmbeddings.delete(cacheKey);
+  }
 }
 
 /**

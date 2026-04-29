@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { generateEmbedding } from "@/lib/embedding-model";
 
 /**
@@ -278,23 +278,12 @@ export async function POST(req: Request) {
 
     console.log("📝 User query:", message);
 
-    // Check if database has recipes
-    const recipeCount = await prisma.recipe.count();
-    const embeddingCount = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "embeddings"`) as any[];
-    const embeddingCountNum = Number(embeddingCount[0]?.count ?? 0);
-    
-    console.log("📊 Total recipes in database:", recipeCount);
-    console.log("📊 Total embeddings in database:", embeddingCountNum);
-
+    // Check if database has recipes (single lightweight query on hot path)
+    const recipeCount = await withPrismaReconnect(() => prisma.recipe.count());
     if (recipeCount === 0) {
       return NextResponse.json({
         reply: "I don't have any recipes in my database yet. Please run the load script to import recipes first:\n\n```bash\nnpm run load\n```\n\nOr if you're using the TypeScript script:\n```bash\nnpx ts-node scripts/load.ts\n```"
       });
-    }
-
-    // Note: We'll use text search if embeddings are not available
-    if (embeddingCountNum === 0) {
-      console.log("⚠️ No embeddings found, will use text-based search");
     }
 
     const mealPlanMatch = message.match(/generate a meal plan with ingredients:\s*([^\.]+)/i);
@@ -335,13 +324,13 @@ export async function POST(req: Request) {
       try {
         // Escape the literal to prevent SQL injection (though it's already a number array)
         const sanitizedLiteral = qLiteral.replace(/'/g, "''");
-        results = await prisma.$queryRawUnsafe(`
+        results = await withPrismaReconnect(() => prisma.$queryRawUnsafe(`
           SELECT r.*, e.vector <-> '${sanitizedLiteral}'::vector AS distance
           FROM "embeddings" e
           JOIN "Recipe" r ON e."recipeId" = r.id
           ORDER BY e.vector <-> '${sanitizedLiteral}'::vector
           LIMIT 5;
-        `) as any[];
+        `)) as any[];
         console.log("✅ Found", results.length, "recipes using vector search");
       } catch (searchError: any) {
         console.warn("⚠️ Vector search failed, falling back to text search:", searchError.message);
@@ -384,14 +373,10 @@ export async function POST(req: Request) {
             whereClause.prepTime = { lte: maxPrepTime };
           }
           
-          const textResults = await prisma.recipe.findMany({
+          const textResults = await withPrismaReconnect(() => prisma.recipe.findMany({
             where: whereClause,
             take: 10, // Get more results to filter better
-            orderBy: [
-              // Prioritize recipes with matching ingredients
-              { ingredients: 'asc' }
-            ]
-          });
+          }));
           
           // Filter and sort results by relevance
           const scoredResults = textResults.map((r: any) => {
@@ -412,10 +397,10 @@ export async function POST(req: Request) {
           console.log("✅ Found", results.length, "recipes using text search");
         } else {
           // If no search terms, get random recipes
-          results = await prisma.recipe.findMany({
+          results = await withPrismaReconnect(() => prisma.recipe.findMany({
             take: 5,
             orderBy: { id: 'asc' }
-          });
+          }));
           results = results.map((r: any) => ({ ...r, distance: 0.5 }));
           console.log("✅ No specific search terms, returning sample recipes");
         }
@@ -427,7 +412,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Re-rank vector hits with lexical relevance and reject noisy matches.
+    // Re-rank hits with lexical relevance and reject noisy matches.
     const searchTerms: string[] = (
       mealPlanIngredients.length > 0 ? mealPlanIngredients : extractSearchTerms(message)
     ).map(normalizeSearchToken);
@@ -451,37 +436,6 @@ export async function POST(req: Request) {
         // No lexical signal at all: avoid showing random vector neighbors.
         results = [];
       }
-    }
-
-    // Recovery query: broad lexical lookup when vector + strict rerank returns nothing.
-    if (results.length === 0 && searchTerms.length > 0) {
-      const broadTerms: string[] = Array.from(
-        new Set(
-          searchTerms.flatMap((term: string) =>
-            term === "lamb"
-              ? ["lamb", "mutton", "goat"]
-              : term === "biryani"
-                ? ["biryani", "biriyani"]
-                : [term]
-          )
-        )
-      );
-
-      const broadMatches = await prisma.recipe.findMany({
-        where: {
-          OR: broadTerms.flatMap((term) => [
-            { title: { contains: term, mode: "insensitive" as const } },
-            { ingredients: { contains: term, mode: "insensitive" as const } },
-          ]),
-        },
-        take: 30,
-      });
-
-      results = broadMatches
-        .map((r: any) => ({ ...r, relevanceScore: lexicalRelevanceScore(r, broadTerms), distance: 0.8 }))
-        .filter((r: any) => (r.relevanceScore ?? 0) > 0)
-        .sort((a: any, b: any) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
-        .slice(0, 5);
     }
 
     console.log("✅ Found", results.length, "matching recipes");

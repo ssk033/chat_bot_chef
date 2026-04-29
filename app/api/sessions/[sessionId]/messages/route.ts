@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
 function titleFromFirstUserMessage(text: string): string {
@@ -26,14 +26,10 @@ export async function POST(
       return NextResponse.json({ error: "Invalid session" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { anonymousKey } });
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const session = await prisma.chatSession.findFirst({
-      where: { id: sessionId, userId: user.id },
-    });
+    const session = await withPrismaReconnect(() => prisma.chatSession.findFirst({
+      where: { id: sessionId, user: { anonymousKey } },
+      select: { id: true, title: true },
+    }));
     if (!session) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -65,19 +61,21 @@ export async function POST(
       newTitle = titleFromFirstUserMessage(firstUser.content);
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.chatMessage.createMany({
-        data: normalized.map((m) => ({
-          sessionId,
-          role: m.role,
-          content: m.content,
-        })),
-      });
-      await tx.chatSession.update({
-        where: { id: sessionId },
-        data: newTitle ? { title: newTitle } : { title: session.title },
-      });
-    });
+    await withPrismaReconnect(() =>
+      prisma.$transaction(async (tx) => {
+        await tx.chatMessage.createMany({
+          data: normalized.map((m) => ({
+            sessionId,
+            role: m.role,
+            content: m.content,
+          })),
+        });
+        await tx.chatSession.update({
+          where: { id: sessionId },
+          data: newTitle ? { title: newTitle } : { title: session.title },
+        });
+      })
+    );
 
     return NextResponse.json({ ok: true, title: newTitle ?? session.title });
   } catch (e: unknown) {

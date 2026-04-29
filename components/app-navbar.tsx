@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { IconChefHat } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { clearStoredUser, getStoredUser } from "@/lib/client-auth";
+import { ChefLogo } from "@/components/chef-logo";
 
 type AppNavbarProps = {
   showAuth?: boolean;
@@ -13,25 +13,23 @@ type AppNavbarProps = {
 
 export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(() => Boolean(getStoredUser()));
+  const loggedIn = useSyncExternalStore(
+    () => () => {},
+    () => Boolean(getStoredUser()),
+    () => false
+  );
 
   const talkToChefHref = loggedIn ? "/chat-bot-chef" : "/auth/login?next=/chat-bot-chef";
 
   const handleLogout = () => {
     clearStoredUser();
-    setLoggedIn(false);
     router.push("/auth/login");
   };
 
   return (
     <nav className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--surface)]/90 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-2.5">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="chef-icon-badge flex h-9 w-9 items-center justify-center rounded-lg">
-            <IconChefHat size={20} className="green-shine-icon" />
-          </span>
-          <span className="text-base font-semibold tracking-tight">Meal-IT!!</span>
-        </Link>
+        <ChefLogo compact />
 
         <div className="flex items-center gap-2">
           <ThemeToggle />

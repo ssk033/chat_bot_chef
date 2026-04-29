@@ -47,17 +47,21 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div
+      className="relative min-h-screen bg-[var(--background)] bg-cover bg-center bg-no-repeat text-[var(--foreground)]"
+      style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-black/30 dark:bg-black/50" />
       <AppNavbar />
-      <main className="mx-auto w-full max-w-6xl px-4 py-10">
-        <div className="mb-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-4">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-10">
+        <div className="theme-panel mb-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5">
           <div>
             <h1 className="text-3xl font-bold">Meal-IT!! Dashboard</h1>
-            <p className="text-sm text-[var(--muted-text)]">Built by Sanidhya Singh</p>
+            <p className="text-sm text-[var(--muted-text)]">Built by Sanidhya, Rajnish, Sachet, Aayush</p>
           </div>
           <Link
             href="/chat-bot-chef"
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)]"
+            className="glow-pill inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:opacity-90"
           >
             <IconMessageCircle size={16} />
             Talk to Chef!!
@@ -68,7 +72,7 @@ export default function DashboardPage() {
           {cards.map((card) => (
             <div
               key={card.title}
-              className="flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-6 shadow-sm"
+              className="theme-panel flex h-full flex-col rounded-2xl p-6"
             >
               <h2 className="mb-2 text-xl font-semibold">{card.title}</h2>
               <p className="mb-5 text-sm text-[var(--muted-text)]">
@@ -76,7 +80,7 @@ export default function DashboardPage() {
               </p>
               <Link
                 href={card.href}
-                className="mt-auto inline-flex rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90"
+                className="glow-pill mt-auto inline-flex rounded-lg px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:opacity-90"
               >
                 {card.cta}
               </Link>

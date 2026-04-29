@@ -58,16 +58,20 @@ export default function NutritionTrackerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div
+      className="relative min-h-screen bg-[var(--background)] bg-cover bg-center bg-no-repeat text-[var(--foreground)]"
+      style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-black/30 dark:bg-black/50" />
       <AppNavbar />
-      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-3">
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:col-span-1">
+      <main className="relative z-10 mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-3">
+        <section className="theme-panel rounded-2xl p-5 md:col-span-1">
           <h1 className="mb-4 text-xl font-bold">Add Meal</h1>
           <div className="space-y-3">
             <select
               value={meal}
               onChange={(e) => setMeal(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             >
               <option value="breakfast">Breakfast</option>
               <option value="lunch">Lunch</option>
@@ -78,19 +82,19 @@ export default function NutritionTrackerPage() {
               value={food}
               onChange={(e) => setFood(e.target.value)}
               placeholder="Food name"
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2"
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]"
             />
-            <input type="number" value={calories} onChange={(e) => setCalories(Number(e.target.value))} placeholder="Calories" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2" />
-            <input type="number" value={protein} onChange={(e) => setProtein(Number(e.target.value))} placeholder="Protein" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2" />
-            <input type="number" value={carbs} onChange={(e) => setCarbs(Number(e.target.value))} placeholder="Carbs" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2" />
-            <input type="number" value={fats} onChange={(e) => setFats(Number(e.target.value))} placeholder="Fats" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2" />
-            <button onClick={add} className="w-full rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)]">
+            <input type="number" value={calories} onChange={(e) => setCalories(Number(e.target.value))} placeholder="Calories" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]" />
+            <input type="number" value={protein} onChange={(e) => setProtein(Number(e.target.value))} placeholder="Protein" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]" />
+            <input type="number" value={carbs} onChange={(e) => setCarbs(Number(e.target.value))} placeholder="Carbs" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]" />
+            <input type="number" value={fats} onChange={(e) => setFats(Number(e.target.value))} placeholder="Fats" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]" />
+            <button onClick={add} className="btn-solid w-full rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90">
               Add to Tracker
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 md:col-span-2">
+        <section className="theme-panel rounded-2xl p-5 md:col-span-2">
           <h2 className="mb-4 text-xl font-bold">Today Summary</h2>
           <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat title="Calories" value={totals.calories} />
@@ -120,7 +124,7 @@ export default function NutritionTrackerPage() {
 
 function Stat({ title, value }: { title: string; value: number }) {
   return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3">
+    <div className="theme-panel rounded-lg p-3">
       <p className="text-xs text-[var(--muted-text)]">{title}</p>
       <p className="text-lg font-semibold">{value}</p>
     </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
@@ -20,26 +20,17 @@ export async function POST(req: Request) {
       displayName: true,
     } as const;
 
-    let user = await prisma.user.findUnique({
-      where: { anonymousKey },
-      select,
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
+    const user = await withPrismaReconnect(() =>
+      prisma.user.upsert({
+        where: { anonymousKey },
+        update: displayNameIn !== undefined ? { displayName: displayNameIn } : {},
+        create: {
           anonymousKey,
           displayName: displayNameIn ?? "Guest",
         },
         select,
-      });
-    } else if (displayNameIn !== undefined) {
-      user = await prisma.user.update({
-        where: { anonymousKey },
-        data: { displayName: displayNameIn },
-        select,
-      });
-    }
+      })
+    );
 
     return NextResponse.json({ user });
   } catch (e: unknown) {

@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppNavbar } from "@/components/app-navbar";
 
-type Msg = { role: "user" | "bot"; text: string };
+type Msg = { id: string; role: "user" | "bot"; text: string };
 
 function MealPlanChatContent() {
   const params = useSearchParams();
@@ -33,8 +33,8 @@ function MealPlanChatContent() {
         const data = await res.json();
         if (!mounted) return;
         setMessages([
-          { role: "user", text: initialPrompt },
-          { role: "bot", text: data.reply || "No plan generated." },
+          { id: crypto.randomUUID(), role: "user", text: initialPrompt },
+          { id: crypto.randomUUID(), role: "bot", text: data.reply || "No plan generated." },
         ]);
       } finally {
         if (mounted) setLoading(false);
@@ -50,7 +50,7 @@ function MealPlanChatContent() {
     if (!input.trim() || loading) return;
     const userText = input.trim();
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", text: userText }]);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text: userText }]);
     setLoading(true);
     try {
       const res = await fetch("/api/query", {
@@ -59,7 +59,7 @@ function MealPlanChatContent() {
         body: JSON.stringify({ message: userText }),
       });
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "bot", text: data.reply || "No response." }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "bot", text: data.reply || "No response." }]);
     } finally {
       setLoading(false);
     }
@@ -103,8 +103,8 @@ function MealPlanChatContent() {
 
         <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
           <div className="mb-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-            {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
+            {messages.map((m) => (
+              <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
                 <div
                   className={`inline-block max-w-[90%] rounded-xl px-4 py-3 text-sm ${
                     m.role === "user"

@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  IconChefHat,
   IconSend,
   IconPlayerPlay,
   IconPlayerStop,
@@ -17,10 +17,15 @@ import { getStoredUser } from "@/lib/client-auth";
 
 const LS_DISPLAY_NAME = "chef_display_name";
 const LS_SIDEBAR_COLLAPSED = "chef_sidebar_collapsed";
+type ChatMessage = { id: string; role: string; text: string };
+
+function createMessage(role: string, text: string): ChatMessage {
+  return { id: crypto.randomUUID(), role, text };
+}
 
 export default function ChatBotChefPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -73,7 +78,8 @@ export default function ChatBotChefPage() {
       if (!res.ok) return;
       const data = await res.json();
       setMessages(
-        (data.messages ?? []).map((m: { role: string; text: string }) => ({
+        (data.messages ?? []).map((m: { id?: number; role: string; text: string }) => ({
+          id: m.id ? String(m.id) : crypto.randomUUID(),
           role: m.role,
           text: m.text,
         }))
@@ -114,17 +120,7 @@ export default function ChatBotChefPage() {
     const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
-
-    fetch("/api/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "__check_model__" }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setModelStatus({ available: !data.error || Boolean(data.reply), loading: false });
-      })
-      .catch(() => setModelStatus({ available: false, loading: false }));
+    setModelStatus({ available: true, loading: false });
 
     return () => {
       window.speechSynthesis.cancel();
@@ -228,7 +224,7 @@ export default function ChatBotChefPage() {
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isLoading]);
+  }, [messages.length]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsed((c) => {
@@ -377,15 +373,12 @@ export default function ChatBotChefPage() {
       const waitTime = Math.ceil((minRequestInterval - timeSinceLastRequest) / 1000);
       setMessages((prev) => [
         ...prev,
-        {
-          role: "bot",
-          text: `Please wait ${waitTime} second${waitTime > 1 ? "s" : ""} before sending another message.`,
-        },
+        createMessage("bot", `Please wait ${waitTime} second${waitTime > 1 ? "s" : ""} before sending another message.`),
       ]);
       return;
     }
 
-    const userMsg = { role: "user", text: input };
+    const userMsg = createMessage("user", input);
     setMessages((prev) => [...prev, userMsg]);
     const userInput = input;
     setInput("");
@@ -409,12 +402,12 @@ export default function ChatBotChefPage() {
 
       if (res.status === 429) {
         botReply = data.reply || "Rate limit reached. Please wait a moment and try again.";
-        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
+        setMessages((prev) => [...prev, createMessage("bot", botReply)]);
       } else if (data.error && !data.reply) {
-        setMessages((prev) => [...prev, { role: "bot", text: `Error: ${data.error}` }]);
+        setMessages((prev) => [...prev, createMessage("bot", `Error: ${data.error}`)]);
       } else {
         botReply = data.reply || "Sorry, I couldn't generate a response.";
-        setMessages((prev) => [...prev, { role: "bot", text: botReply }]);
+        setMessages((prev) => [...prev, createMessage("bot", botReply)]);
       }
 
       if (botReply !== null) {
@@ -424,10 +417,7 @@ export default function ChatBotChefPage() {
       console.error("Chat error:", error);
       setMessages((prev) => [
         ...prev,
-        {
-          role: "bot",
-          text: "Error: Could not get response. Please check your connection and try again.",
-        },
+        createMessage("bot", "Error: Could not get response. Please check your connection and try again."),
       ]);
     } finally {
       setIsLoading(false);
@@ -512,17 +502,54 @@ export default function ChatBotChefPage() {
             >
               <IconMenu2 size={22} stroke={1.5} />
             </button>
-            <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-initial sm:gap-3.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)] sm:h-10 sm:w-10">
-                <IconChefHat size={22} stroke={1.75} aria-hidden className="green-shine-icon" />
+            <Link
+              href="/"
+              className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition hover:opacity-80 hover:scale-[1.01] sm:flex-initial sm:gap-3.5"
+              aria-label="Go to homepage"
+            >
+              <span className="chef-icon-badge flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
+                <span className="text-emerald-950 dark:text-emerald-100">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-[22px] w-[22px]"
+                    aria-hidden
+                  >
+                    <path
+                      d="M6 10.5C4.34315 10.5 3 9.15685 3 7.5C3 5.84315 4.34315 4.5 6 4.5C6.64013 4.5 7.23342 4.70042 7.72065 5.04209C8.77899 3.79396 10.3578 3 12.125 3C13.8922 3 15.471 3.79396 16.5294 5.04209C17.0166 4.70042 17.6099 4.5 18.25 4.5C19.9069 4.5 21.25 5.84315 21.25 7.5C21.25 9.15685 19.9069 10.5 18.25 10.5H6Z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6.5 10.5V15.5C6.5 17.9853 8.51472 20 11 20H13C15.4853 20 17.5 17.9853 17.5 15.5V10.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M10 14H14"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </span>
               <div className="min-w-0 md:block">
-                <p className="truncate text-sm font-semibold tracking-tight sm:text-base">Chef</p>
+                <p className="truncate text-sm font-semibold tracking-tight text-gray-900 dark:text-white sm:text-base">
+                  Chef
+                </p>
                 <p className="hidden truncate text-xs text-[var(--muted-text)] sm:block sm:text-[13px]">
                   Recipe search & cooking Q&A
                 </p>
               </div>
-            </div>
+            </Link>
             <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
               <ThemeToggle />
               {modelStatus.loading ? (
@@ -563,8 +590,32 @@ export default function ChatBotChefPage() {
               <div className="chat-scroll-area min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:px-5 sm:py-5">
                 {messages.length === 0 ? (
                   <div className="flex min-h-[min(50dvh,20rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[280px]">
-                    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-muted)] text-[var(--muted-text)] ring-1 ring-[var(--border-subtle)] sm:h-16 sm:w-16">
-                      <IconChefHat size={30} stroke={1.5} aria-hidden className="green-shine-icon" />
+                    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-muted)] ring-1 ring-[var(--border-subtle)] sm:h-16 sm:w-16">
+                      <svg
+                        width="30"
+                        height="30"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="text-emerald-950 dark:text-emerald-100"
+                        aria-hidden
+                      >
+                        <path
+                          d="M6 10.5C4.34315 10.5 3 9.15685 3 7.5C3 5.84315 4.34315 4.5 6 4.5C6.64013 4.5 7.23342 4.70042 7.72065 5.04209C8.77899 3.79396 10.3578 3 12.125 3C13.8922 3 15.471 3.79396 16.5294 5.04209C17.0166 4.70042 17.6099 4.5 18.25 4.5C19.9069 4.5 21.25 5.84315 21.25 7.5C21.25 9.15685 19.9069 10.5 18.25 10.5H6Z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M6.5 10.5V15.5C6.5 17.9853 8.51472 20 11 20H13C15.4853 20 17.5 17.9853 17.5 15.5V10.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M10 14H14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
                     </div>
                     <h2 className="max-w-md text-base font-medium tracking-tight text-[var(--foreground)] sm:text-lg">
                       Ask anything about recipes or ingredients
@@ -575,9 +626,9 @@ export default function ChatBotChefPage() {
                   </div>
                 ) : (
                   <div className="space-y-4 sm:space-y-5">
-                    {messages.map((m, i) => (
+                    {messages.map((m) => (
                       <div
-                        key={i}
+                        key={m.id}
                         className={`message-enter flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
