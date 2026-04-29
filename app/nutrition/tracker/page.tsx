@@ -58,11 +58,16 @@ export default function NutritionTrackerPage() {
   };
 
   return (
-    <div
-      className="relative min-h-screen bg-[var(--background)] bg-cover bg-center bg-no-repeat text-[var(--foreground)]"
-      style={{ backgroundImage: "url('/food%20backgorund.png')" }}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-black/30 dark:bg-black/50" />
+    <div className="relative min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat dark:hidden"
+        style={{ backgroundImage: "url('/food%20background%20light%20theme.png')" }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 hidden bg-cover bg-center bg-no-repeat dark:block"
+        style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-white/35 dark:bg-black/50" />
       <AppNavbar />
       <main className="relative z-10 mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 md:grid-cols-3">
         <section className="theme-panel rounded-2xl p-5 md:col-span-1">
