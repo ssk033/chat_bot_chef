@@ -1,0 +1,1 @@
+Demo ViT: classification head not trained on FoodX. Replace with fine-tuned weights for real accuracy.

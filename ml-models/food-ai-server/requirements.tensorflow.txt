@@ -1,0 +1,2 @@
+# Keras / MobileNet path (Indian 16-class demo & training export). Python 3.10–3.12 on Windows amd64.
+tensorflow>=2.16.0,<2.20.0

@@ -11,7 +11,12 @@
     "lint": "eslint",
     "load": "npx tsx scripts/load.ts",
     "check-db": "npx tsx scripts/check-db.ts",
-    "clear-db": "npx tsx scripts/clear-db.ts"
+    "clear-db": "npx tsx scripts/clear-db.ts",
+    "food-ai:dev": "node scripts/food-ai-dev.mjs",
+    "food-ai:venv": "bash scripts/setup-food-ai-venv.sh",
+    "food-ai:venv:win": "scripts\\setup-food-ai-venv.bat",
+    "food-ai:init-demo-model": "node scripts/food-ai-run-python.mjs init_demo_model.py",
+    "food-ai:init-demo-foodx": "node scripts/food-ai-run-python.mjs init_demo_foodx.py"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -33,6 +38,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "baseline-browser-mapping": "^2.10.19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "^16.2.3",
     "next": "^16.2.3",

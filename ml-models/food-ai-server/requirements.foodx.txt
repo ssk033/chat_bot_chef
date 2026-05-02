@@ -1,0 +1,6 @@
+# ViT / FoodX-251 path (PyTorch). Install alongside requirements.txt (+ optional tensorflow stack for Keras).
+torch>=2.1.0
+torchvision>=0.16.0
+transformers>=4.36.0
+safetensors>=0.4.0
+pillow>=10.0.0

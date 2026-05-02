@@ -1,5 +1,4 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-.gitignore 
 
 # dependencies
 /node_modules
@@ -23,6 +22,9 @@
 
 # misc
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 *.pem
 
 # debug
@@ -31,28 +33,80 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Secrets & env — never commit (whitelist examples if you add them)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
 
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
+# prisma (generated client stubs in app dir; migrations stay tracked)
 /app/generated/prisma
 
-# trained models (can be large)
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# local tooling
+.cursor/
+
+# Kaggle / API key files
+kaggle.json
+**/kaggle.json
+
+# Hugging Face & ML caches (huge downloads; recreated locally)
+**/.cache/huggingface/
+**/.torch/
+
+# trained / downloaded model weights (large)
 /models/
 RecipeModel/
+ml-models/**/*.pth
+ml-models/**/*.h5
+ml-models/**/*.keras
+ml-models/**/*.onnx
+ml-models/**/*.pb
+ml-models/**/*.tflite
+ml-models/**/tensorflow_saved_model**/
+ml-models/weights/.food_classifier_demo
 *.safetensors
 
-# large data files
+# Jupyter
+.ipynb_checkpoints/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python virtual environments (anywhere in repo)
+**/.venv/
+**/venv/
+**/.venv-*/
+ENV/
+.env.venv/
+
+# Food AI ML venv (Python 3.12 + stacks; keep local only)
+/.venv-food-ai/
+
+# large / local datasets (never push)
 recipes_data.csv
 *.csv.bak
 checkpoints/
+uploads/
+tmp/
+temp/
 
-# deployment docs (keep local, don't push)
-DEPLOYMENT.md
-VERCEL_SETUP.md
+# logs
+logs/
+*.log

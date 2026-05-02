@@ -73,3 +73,20 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+// User feedback after a Food Tracker prediction (for auditing and future retraining / model fixes).
+model FoodAiPredictionReview {
+  id                  Int      @id @default(autoincrement())
+  createdAt           DateTime @default(now())
+  reviewerEmail       String
+  predictedDish       String
+  predictedConfidence Float
+  backend             String?
+  rating              Int
+  comment             String?  @db.Text
+  correctedDish       String?
+  demoLowConfidence   Boolean  @default(false)
+
+  @@index([reviewerEmail, createdAt])
+  @@map("food_ai_prediction_reviews")
+}
+
