@@ -9,6 +9,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint",
+    "verify": "eslint --max-warnings 0 . && next build",
     "load": "npx tsx scripts/load.ts",
     "check-db": "npx tsx scripts/check-db.ts",
     "clear-db": "npx tsx scripts/clear-db.ts",
@@ -19,6 +20,7 @@
     "food-ai:init-demo-foodx": "node scripts/food-ai-run-python.mjs init_demo_foodx.py"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "@google/generative-ai": "^0.24.1",
     "@tabler/icons-react": "^3.35.0",
     "clsx": "^2.1.1",
@@ -31,7 +33,6 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "@prisma/client": "^6.19.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.0",

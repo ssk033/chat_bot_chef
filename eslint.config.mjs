@@ -25,6 +25,17 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local Python / ML envs and artifacts (must not be linted on CI or deploy)
+    ".venv-food-ai/**",
+    ".venv/**",
+    "venv/**",
+    "**/site-packages/**",
+    "node_modules/**",
+    "RecipeModel/**",
+    "ml-models/**",
+    "coverage/**",
+    "**/__pycache__/**",
+    ".turbo/**",
   ]),
 ]);
 

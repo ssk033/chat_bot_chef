@@ -1,7 +1,36 @@
 import { NextResponse } from "next/server";
+import { estimateFoodWithGeminiVision } from "@/lib/gemini-food-vision";
 
 // Must match `FOOD_AI_PORT` in scripts/food-ai-dev.mjs (default 8788).
 const UPSTREAM = process.env.FOOD_AI_SERVICE_URL ?? "http://127.0.0.1:8788";
+
+/** When CNN softmax/confidence is strictly below this (0–1), run Gemini Vision on the same image. */
+const CNN_CONFIDENCE_THRESHOLD = 0.6;
+
+export const runtime = "nodejs";
+
+function normalizeConfidence(c: unknown): number {
+  const n = Number(c);
+  if (!Number.isFinite(n)) return 0;
+  if (n > 1 && n <= 100) return Math.min(1, Math.max(0, n / 100));
+  if (n > 100) return 1;
+  return Math.min(1, Math.max(0, n));
+}
+
+/** Strip fields that would reveal which backend answered (CNN vs Gemini). */
+function sanitizeForClient(body: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...body };
+  delete out.predictionSource;
+  delete out.predictionNote;
+  delete out.cnnConfidence;
+  delete out.cnnDish;
+  return out;
+}
+
+function cnnBackendOnly(parsed: Record<string, unknown>): string | undefined {
+  const b = parsed.backend;
+  return b === "foodx" || b === "keras" || b === "clip" ? b : undefined;
+}
 
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -10,19 +39,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing image field (multipart form)." }, { status: 400 });
   }
 
-  const upstream = new FormData();
-  upstream.append("image", file, "upload.jpg");
+  const mimeType = file.type || "image/jpeg";
+  const imageBuffer = Buffer.from(await file.arrayBuffer());
 
+  const upstream = new FormData();
+  upstream.append("image", new Blob([imageBuffer], { type: mimeType }), "upload.jpg");
+
+  let text: string;
+  let res: Response;
   try {
-    const res = await fetch(`${UPSTREAM}/predict`, {
+    res = await fetch(`${UPSTREAM}/predict`, {
       method: "POST",
       body: upstream,
     });
-    const text = await res.text();
-    return new NextResponse(text, {
-      status: res.status,
-      headers: { "Content-Type": "application/json" },
-    });
+    text = await res.text();
   } catch {
     return NextResponse.json(
       {
@@ -31,4 +61,61 @@ export async function POST(request: Request) {
       { status: 503 }
     );
   }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return new NextResponse(text, {
+      status: res.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!res.ok) {
+    return NextResponse.json(parsed, { status: res.status });
+  }
+
+  const conf = normalizeConfidence(parsed.confidence);
+  const useGemini = conf < CNN_CONFIDENCE_THRESHOLD;
+
+  if (!useGemini) {
+    return NextResponse.json(
+      sanitizeForClient({
+        ...parsed,
+        confidence: conf,
+      })
+    );
+  }
+
+  const gemini = await estimateFoodWithGeminiVision({
+    imageBuffer,
+    mimeType,
+    cnnDish: typeof parsed.dish === "string" ? parsed.dish : undefined,
+    cnnConfidence: conf,
+  });
+
+  if (!gemini) {
+    return NextResponse.json(
+      sanitizeForClient({
+        ...parsed,
+        confidence: conf,
+      })
+    );
+  }
+
+  return NextResponse.json(
+    sanitizeForClient({
+      dish: gemini.dish,
+      confidence: gemini.confidence,
+      calories: gemini.calories,
+      protein_g: gemini.protein_g,
+      carbs_g: gemini.carbs_g,
+      fats_g: gemini.fats_g,
+      backend: cnnBackendOnly(parsed),
+      demoMode: parsed.demoMode,
+      demoLowConfidence: false,
+      demoHint: parsed.demoHint,
+    })
+  );
 }

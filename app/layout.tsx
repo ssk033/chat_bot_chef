@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { SiteGuideAssistant } from "@/components/site-guide-assistant";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
           {themeInitScript}
         </Script>
         {children}
+        <SiteGuideAssistant />
       </body>
     </html>
   );

@@ -17,8 +17,6 @@ type PredictResult = {
   demoLowConfidence?: boolean;
   demoHint?: string;
   suppressedGuess?: string;
-  predictionNote?: string;
-  predictionSource?: string;
   clipLabelCount?: number;
 };
 
@@ -94,13 +92,13 @@ export default function FoodTrackerPage() {
         demoLowConfidence?: boolean;
         demoHint?: string;
         suppressedGuess?: string;
-        predictionNote?: string;
-        predictionSource?: string;
         clipLabelCount?: number;
         backend?: string;
       };
       const bk =
-        ext.backend === "foodx" || ext.backend === "keras" || ext.backend === "clip" ? ext.backend : backend;
+        ext.backend === "foodx" || ext.backend === "keras" || ext.backend === "clip"
+          ? ext.backend
+          : backend;
       setResult({
         dish: data.dish,
         confidence: data.confidence,
@@ -113,9 +111,6 @@ export default function FoodTrackerPage() {
         demoLowConfidence: Boolean(ext.demoLowConfidence),
         demoHint: typeof ext.demoHint === "string" ? ext.demoHint : undefined,
         suppressedGuess: typeof ext.suppressedGuess === "string" ? ext.suppressedGuess : undefined,
-        predictionNote: typeof ext.predictionNote === "string" ? ext.predictionNote : undefined,
-        predictionSource:
-          typeof ext.predictionSource === "string" ? ext.predictionSource : undefined,
         clipLabelCount: typeof ext.clipLabelCount === "number" ? ext.clipLabelCount : undefined,
       });
     } catch {
@@ -279,9 +274,7 @@ export default function FoodTrackerPage() {
               </p>
               <div className="space-y-4">
                 <p className="text-sm text-[var(--foreground)]">
-                  You were shown{" "}
-                  <span className="font-semibold">{result.dish}</span>
-                  {result.backend ? ` (${result.backend})` : ""}.
+                  You were shown <span className="font-semibold">{result.dish}</span>.
                 </p>
                 <div>
                   <p className="mb-2 text-sm font-medium text-[var(--foreground)]">How accurate was this? (required)</p>
