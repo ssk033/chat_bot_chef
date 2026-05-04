@@ -62,10 +62,10 @@ export default function MealPlanAiSavedDetailPage() {
           <IconArrowLeft size={18} aria-hidden />
           Saved meal plans
         </Link>
-        <article className="mt-6 rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-6 shadow-[0_10px_30px_color-mix(in_srgb,var(--foreground)_12%,transparent)] backdrop-blur-xl md:p-8 dark:border-white/[0.09]">
+        <article className="mt-6 rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-6 shadow-[0_10px_30px_color-mix(in_srgb,var(--foreground)_12%,transparent)] backdrop-blur-xl md:p-8 dark:border-white/[0.09]">
           <h1 className="text-2xl font-bold text-[var(--foreground)]">{entry.name}</h1>
           <p className="mt-2 text-sm text-[var(--muted-text)]">{formatWhen(entry.createdAt)}</p>
-          <div className="mt-6 whitespace-pre-wrap break-words border-t border-[var(--border-subtle)] pt-6 text-sm leading-relaxed text-[var(--foreground)] dark:border-white/[0.06]">
+          <div className="mt-6 whitespace-pre-wrap break-words border-t border-[var(--border)] pt-6 text-sm leading-relaxed text-[var(--foreground)] dark:border-white/[0.06]">
             {entry.content}
           </div>
         </article>

@@ -136,7 +136,7 @@ function MealPlanChatContent() {
             type="button"
             onClick={saveLatestPlannerReply}
             disabled={loading || messages.filter((m) => m.role === "bot").length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur transition-all hover:bg-[var(--surface-muted)] disabled:pointer-events-none disabled:opacity-45 dark:border-white/[0.1]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur transition-all hover:bg-[var(--surface-muted)] disabled:pointer-events-none disabled:opacity-45 dark:border-white/[0.1]"
           >
             <IconBookmark size={18} stroke={1.75} aria-hidden />
             Save latest reply
@@ -163,7 +163,7 @@ function MealPlanChatContent() {
         >
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-              <div className="mx-auto max-w-[760px] space-y-4 px-2 py-3 sm:px-4 sm:py-4">
+              <div className="mx-auto max-w-[760px] space-y-6 px-2 py-4 sm:px-4 sm:py-5">
                 {messages.map((m) => (
                   <ChatMessage
                     key={m.id}

@@ -22,26 +22,26 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
   const displayTitle = sanitizeAssistantDisplayText(recipe.title?.trim() || "Recipe");
 
   return (
-    <div className="mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/80 p-5 shadow-sm ring-1 ring-black/[0.03] dark:bg-[var(--surface-muted)] dark:ring-white/[0.06] sm:p-6">
+    <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition hover:shadow-md sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <h3 className="text-lg font-semibold leading-snug tracking-tight text-[var(--foreground)]">{displayTitle}</h3>
+        <h3 className="text-xl font-semibold leading-snug tracking-tight text-[var(--foreground)]">{displayTitle}</h3>
         {badge ? (
-          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-[var(--accent-muted)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] ring-1 ring-[var(--accent)]/20">
+          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface))] px-3 py-1.5 text-sm font-medium text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_28%,var(--border))]">
             <IconFlame size={16} stroke={1.75} aria-hidden />
             {badge}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-6 space-y-4 border-t border-[var(--border-subtle)] pt-5">
-        <details open className="group rounded-xl bg-[var(--surface)]/60 ring-1 ring-[var(--border-subtle)] dark:bg-[var(--surface)]/40">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--surface-muted)]/50 [&::-webkit-details-marker]:hidden">
+      <div className="mt-6 space-y-4 border-t border-[var(--border)] pt-5">
+        <details open className="group rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_96%,var(--background))] shadow-sm transition hover:shadow-md">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[color-mix(in_srgb,var(--surface)_88%,var(--background))] [&::-webkit-details-marker]:hidden">
             <span className="flex items-center justify-between gap-2">
               Ingredients
               <span className="text-xs font-normal text-[var(--muted-text)]">{recipe.ingredients.length} items</span>
             </span>
           </summary>
-          <ul className="space-y-2.5 border-t border-[var(--border-subtle)] px-4 pb-4 pt-3 text-sm leading-relaxed text-[var(--foreground)]">
+          <ul className="space-y-2.5 border-t border-[var(--border)] px-4 pb-4 pt-3 text-sm leading-relaxed text-[var(--foreground)]">
             {recipe.ingredients.map((item, idx) => (
               <li key={idx} className="flex gap-2.5 pl-1">
                 <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" aria-hidden />
@@ -51,18 +51,18 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
           </ul>
         </details>
 
-        <details open className="group rounded-xl bg-[var(--surface)]/60 ring-1 ring-[var(--border-subtle)] dark:bg-[var(--surface)]/40">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--surface-muted)]/50 [&::-webkit-details-marker]:hidden">
+        <details open className="group rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_96%,var(--background))] shadow-sm transition hover:shadow-md">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[color-mix(in_srgb,var(--surface)_88%,var(--background))] [&::-webkit-details-marker]:hidden">
             <span className="flex items-center justify-between gap-2">
               Steps
               <span className="text-xs font-normal text-[var(--muted-text)]">{recipe.steps.length} steps</span>
             </span>
           </summary>
-          <ol className="space-y-4 border-t border-[var(--border-subtle)] px-4 pb-4 pt-4 text-sm leading-relaxed text-[var(--foreground)]">
+          <ol className="space-y-4 border-t border-[var(--border)] px-4 pb-4 pt-4 text-sm leading-relaxed text-[var(--foreground)]">
             {recipe.steps.map((step, idx) => (
               <li key={idx} className="relative flex gap-4 pl-1">
                 <span
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-xs font-semibold text-[var(--accent)] ring-1 ring-[var(--accent)]/15"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface))] text-xs font-semibold text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_22%,var(--border))]"
                   aria-hidden
                 >
                   {idx + 1}

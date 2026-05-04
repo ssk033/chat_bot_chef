@@ -86,7 +86,7 @@ export default function SavedMealPlansPage() {
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">Intake drafts</h2>
             {drafts.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
+              <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
                 <p className="text-sm text-[var(--muted-text)]">No drafts yet.</p>
                 <Link href="/meal-plan/create" className="mt-3 inline-block text-sm font-semibold text-[var(--accent)] hover:underline">
                   Create intake
@@ -97,7 +97,7 @@ export default function SavedMealPlansPage() {
                 {drafts.map((p: MealPlanRecord) => (
                   <li
                     key={p.id}
-                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 shadow-[0_8px_28px_-12px_color-mix(in_srgb,var(--foreground)_18%,transparent)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)]"
+                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 shadow-[0_8px_28px_-12px_color-mix(in_srgb,var(--foreground)_18%,transparent)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)]"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 space-y-2">
@@ -120,7 +120,7 @@ export default function SavedMealPlansPage() {
                         </Link>
                         <Link
                           href={`/meal-plan/create?edit=${p.id}`}
-                          className="rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-center text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
+                          className="rounded-xl border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
                         >
                           Edit intake
                         </Link>
@@ -143,7 +143,7 @@ export default function SavedMealPlansPage() {
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">Planner replies</h2>
             {plannerReplies.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
+              <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
                 <p className="text-sm text-[var(--muted-text)]">Nothing saved from planner chat yet.</p>
                 <Link href="/meal-plan/create" className="mt-3 inline-block text-sm font-semibold text-[var(--accent)] hover:underline">
                   Start from intake → planner chat
@@ -154,7 +154,7 @@ export default function SavedMealPlansPage() {
                 {plannerReplies.map((s: AiSavedMealPlan) => (
                   <li
                     key={s.id}
-                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 backdrop-blur-xl transition-colors hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-subtle))] dark:border-white/[0.08]"
+                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 backdrop-blur-xl transition-colors hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] dark:border-white/[0.08]"
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-2">

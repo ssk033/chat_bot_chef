@@ -26,7 +26,7 @@ export function ChefLogo({
     >
       <ChefAvatar size={compact ? 34 : 36} sizeSm={compact ? undefined : 40} />
       <span className="min-w-0">
-        <span className="block truncate text-base font-semibold tracking-tight text-gray-900 dark:text-white">
+        <span className="block truncate text-base font-semibold tracking-tight text-[var(--foreground)]">
           {title}
         </span>
         {subtitle ? (

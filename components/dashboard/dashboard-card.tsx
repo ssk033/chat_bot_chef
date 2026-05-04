@@ -38,16 +38,15 @@ export function DashboardCard({
   return (
     <div
       className={twMerge(
-        "flex min-h-[200px] flex-col justify-between space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06]",
-        "motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18",
+        "flex min-h-[200px] flex-col justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition-all duration-200 hover:shadow-md",
         className
       )}
     >
-      <div className="space-y-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] p-2 text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_22%,transparent)]">
+      <div className="flex flex-col gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface))] p-2 text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_28%,var(--border))]">
           <Icon size={22} stroke={1.75} aria-hidden />
         </div>
-        <h2 className="text-lg font-semibold leading-snug text-[var(--foreground)]">{title}</h2>
+        <h2 className="text-xl font-semibold leading-snug text-[var(--foreground)]">{title}</h2>
         <p className="text-sm leading-relaxed text-[var(--muted-text)]">{description}</p>
       </div>
       <div className="pt-2">

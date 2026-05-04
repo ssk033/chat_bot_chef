@@ -27,7 +27,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   };
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--surface)]/80 shadow-[0_1px_0_color-mix(in_srgb,var(--border-subtle)_70%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--surface)]/68 dark:border-white/10">
+    <nav className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/80 shadow-[0_1px_0_color-mix(in_srgb,var(--border)_70%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--surface)]/68">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-5">
         <ChefLogo compact />
 
@@ -49,7 +49,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
               </Link>
               <Link
                 href="/auth/register"
-                className="btn-solid rounded-xl bg-[var(--user-bubble-bg)] px-4 py-2.5 text-sm font-medium text-[var(--user-bubble-fg)] shadow-md shadow-black/15 ring-1 ring-black/[0.06] transition-all duration-200 hover:brightness-[1.04] motion-safe:active:scale-[0.98] dark:ring-white/10"
+                className="btn-solid rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-black shadow-sm transition-all duration-200 hover:shadow-md hover:brightness-105 motion-safe:active:scale-[0.98]"
               >
                 Get Started
               </Link>
@@ -66,7 +66,7 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="btn-solid rounded-xl bg-[var(--user-bubble-bg)] px-4 py-2.5 text-sm font-medium text-[var(--user-bubble-fg)] shadow-md ring-1 ring-black/[0.06] transition-all duration-200 hover:brightness-[1.04] motion-safe:active:scale-[0.98] dark:ring-white/10"
+                className="btn-solid rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:shadow-md motion-safe:active:scale-[0.98]"
               >
                 Logout
               </button>

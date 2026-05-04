@@ -55,7 +55,7 @@ export function InputField({
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           className={twMerge(
-            "w-full rounded-xl border border-[var(--border-subtle)] bg-transparent px-4 py-3 text-[var(--foreground)] shadow-sm outline-none transition-all duration-200",
+            "w-full rounded-xl border border-[var(--border)] bg-transparent px-4 py-3 text-[var(--foreground)] shadow-sm outline-none transition-all duration-200",
             "placeholder:text-[var(--muted-text)] placeholder:opacity-80",
             "focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)]",
             isPassword && showPasswordToggle && "pr-12"

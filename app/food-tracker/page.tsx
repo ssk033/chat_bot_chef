@@ -202,7 +202,7 @@ export default function FoodTrackerPage() {
       <main className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
           <div className="min-w-0 flex-1 space-y-8">
-        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:p-8">
+        <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Food Tracker</h1>
             <ModelStatusPill loading={loading} showError={Boolean(error)} />
@@ -224,10 +224,10 @@ export default function FoodTrackerPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
+          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
             <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Upload image</h2>
             <div className="flex flex-1 flex-col space-y-4">
-              <div className="overflow-hidden rounded-xl border border-dashed border-[color-mix(in_srgb,var(--border-subtle)_88%,var(--accent)_12%)] bg-[color-mix(in_srgb,var(--surface-muted)_28%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_18%,var(--surface)_82%)] dark:ring-white/[0.05]">
+              <div className="overflow-hidden rounded-xl border border-dashed border-[color-mix(in_srgb,var(--border)_88%,var(--accent)_12%)] bg-[color-mix(in_srgb,var(--surface-muted)_28%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_18%,var(--surface)_82%)] dark:ring-white/[0.05]">
                 <FileUpload
                   accept={{ "image/*": [] }}
                   multiple={false}
@@ -242,7 +242,7 @@ export default function FoodTrackerPage() {
                 />
               </div>
               {displayPreviewSrc ? (
-                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-muted)_55%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_35%,var(--surface)_65%)] dark:ring-white/[0.05]">
+                <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_55%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_35%,var(--surface)_65%)] dark:ring-white/[0.05]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={displayPreviewSrc} alt="Preview" className="max-h-64 w-full object-contain" />
                 </div>
@@ -263,7 +263,7 @@ export default function FoodTrackerPage() {
             </div>
           </section>
 
-          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
+          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
             <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Result</h2>
             {!result ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 py-8 text-center">
@@ -305,7 +305,7 @@ export default function FoodTrackerPage() {
                     setReviewThanks(false);
                     setReviewError(null);
                   }}
-                  className="btn-solid mt-auto w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:bg-[var(--background)] motion-safe:active:scale-[0.98] dark:border-white/10"
+                  className="btn-solid mt-auto w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:bg-[var(--background)] motion-safe:active:scale-[0.98] dark:border-white/10"
                 >
                   Review this result
                 </button>
@@ -369,7 +369,7 @@ export default function FoodTrackerPage() {
                         className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 ${
                           reviewRating === value
                             ? "border-[var(--user-bubble-bg)] bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)]"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--foreground)]"
+                            : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]"
                         }`}
                       >
                         {label}
@@ -388,7 +388,7 @@ export default function FoodTrackerPage() {
                     onChange={(e) => setReviewCorrectedDish(e.target.value)}
                     disabled={reviewSubmitting}
                     placeholder="e.g. masala dosa"
-                    className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
+                    className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
                     maxLength={512}
                   />
                 </label>
@@ -400,7 +400,7 @@ export default function FoodTrackerPage() {
                     disabled={reviewSubmitting}
                     rows={4}
                     placeholder="Lighting, multiple dishes on plate, wrong cuisine…"
-                    className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
+                    className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
                     maxLength={4000}
                   />
                 </label>
@@ -550,7 +550,7 @@ function parseApiError(data: { error?: string; detail?: unknown }, status: numbe
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-muted)_85%,transparent)] p-3 shadow-sm ring-1 ring-black/[0.03] transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border-subtle))] hover:ring-[var(--accent)]/12 dark:bg-[color-mix(in_srgb,var(--surface-muted)_72%,var(--surface)_28%)] dark:ring-white/[0.05]">
+    <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_85%,transparent)] p-3 shadow-sm ring-1 ring-black/[0.03] transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] hover:ring-[var(--accent)]/12 dark:bg-[color-mix(in_srgb,var(--surface-muted)_72%,var(--surface)_28%)] dark:ring-white/[0.05]">
       <p className="text-xs text-[var(--muted-text)]">{label}</p>
       <p className="text-lg font-semibold tracking-tight">{value}</p>
     </div>

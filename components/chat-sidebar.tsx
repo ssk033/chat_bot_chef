@@ -66,12 +66,12 @@ export function ChatSidebar({
 
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--border-subtle)] bg-[var(--surface-muted)] shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)] transition-[transform,width,background-color] duration-200 ease-out md:translate-x-0 dark:shadow-black/30",
+          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[var(--border)] bg-[var(--surface-muted)] shadow-[4px_0_24px_-12px_rgba(0,0,0,0.08)] transition-[transform,width,background-color] duration-200 ease-out md:translate-x-0 dark:shadow-black/30",
           rail ? "md:w-[72px]" : "w-[min(88vw,280px)] md:w-[260px]",
           mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full md:translate-x-0",
         ].join(" ")}
       >
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3">
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border)] px-3">
           <button
             type="button"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--foreground)] transition hover:bg-[var(--surface)] md:hidden"
@@ -105,7 +105,7 @@ export function ChatSidebar({
           </button>
         </div>
 
-        <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
+        <div className="shrink-0 border-b border-[var(--border)] p-2">
           <button
             type="button"
             onClick={() => {
@@ -114,7 +114,7 @@ export function ChatSidebar({
             }}
             className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:bg-[var(--surface)] hover:shadow-sm motion-safe:active:scale-[0.99]"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] text-[var(--accent)] shadow-sm ring-1 ring-black/[0.03] transition-colors dark:ring-white/[0.06]">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--accent)] shadow-sm ring-1 ring-black/[0.03] transition-colors dark:ring-white/[0.06]">
               <IconPlus size={20} stroke={1.75} aria-hidden />
             </span>
             {!rail ? <span>New chat</span> : null}
@@ -124,7 +124,7 @@ export function ChatSidebar({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2 pt-1">
           {!rail ? (
             <>
-              <div className="mx-2 mb-2 flex items-center gap-2 border-b border-[var(--border-subtle)] pb-2">
+              <div className="mx-2 mb-2 flex items-center gap-2 border-b border-[var(--border)] pb-2">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted-text)]">Chats</p>
               </div>
               <ul className="space-y-1">
@@ -139,7 +139,7 @@ export function ChatSidebar({
                         }}
                         className={`min-w-0 flex-1 rounded-xl py-2.5 pr-2 text-left text-sm transition-all duration-200 motion-safe:active:scale-[0.99] ${
                           activeSessionId === s.id
-                            ? "border-l-2 border-[var(--accent)] bg-[var(--surface)] pl-[10px] font-medium text-[var(--foreground)] shadow-sm ring-1 ring-[var(--border-subtle)] ring-black/[0.04] dark:ring-white/[0.08]"
+                            ? "border-l-2 border-[var(--accent)] bg-[var(--surface)] pl-[10px] font-medium text-[var(--foreground)] shadow-sm ring-1 ring-[var(--border)] ring-black/[0.04] dark:ring-white/[0.08]"
                             : "border-l-2 border-transparent pl-3 text-[var(--foreground)] hover:bg-[var(--surface)]/90"
                         }`}
                         title={s.title}
@@ -179,7 +179,7 @@ export function ChatSidebar({
                   title={s.title}
                   onClick={() => onSelectSession(s.id)}
                   className={`h-2.5 w-2.5 shrink-0 rounded-full transition ${
-                    activeSessionId === s.id ? "bg-[var(--accent)]" : "bg-[var(--border-subtle)] hover:opacity-80"
+                    activeSessionId === s.id ? "bg-[var(--accent)]" : "bg-[var(--border)] hover:opacity-80"
                   }`}
                 />
               ))}
@@ -187,7 +187,7 @@ export function ChatSidebar({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-muted)]/95 p-2 backdrop-blur-sm">
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/95 p-2 backdrop-blur-sm">
           <button
             type="button"
             onClick={onRenameUser}

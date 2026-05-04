@@ -60,7 +60,7 @@ export default function HomePage() {
       <main>
         <HeroSection />
 
-        <section className="relative border-t border-[var(--border-subtle)] py-16 sm:py-20">
+        <section className="relative border-t border-[var(--border)] py-16 sm:py-20">
           <div
             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--foreground)_6%,transparent)] to-[color-mix(in_srgb,var(--foreground)_10%,transparent)] opacity-30 dark:opacity-45"
             aria-hidden
@@ -82,7 +82,7 @@ export default function HomePage() {
 
         <section className="relative mx-auto w-full max-w-6xl px-6 py-16 sm:py-20">
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)] to-transparent"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent"
             aria-hidden
           />
           <div className="home-fade-up home-fade-delay-2">
@@ -102,7 +102,7 @@ export default function HomePage() {
                 Start Meal Planning
               </CTAButton>
               <p className="text-sm leading-relaxed text-[var(--muted-text)]">
-                Meal-IT!! — made by Sanidhya, Rajnish, Sachet, Aayush
+                Meal-IT!! : made by Sanidhya, Rajnish, Sachet, Aayush
               </p>
             </div>
           </div>

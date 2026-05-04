@@ -116,7 +116,7 @@ export function SiteGuideAssistant() {
             className="theme-panel flex max-h-[min(560px,70vh)] w-[min(100vw-2rem,380px)] flex-col overflow-hidden rounded-2xl shadow-2xl"
             aria-label="Site guide assistant"
           >
-            <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2.5">
+            <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)]">
                 <IconSparkles size={18} stroke={1.75} />
               </div>
@@ -168,7 +168,7 @@ export function SiteGuideAssistant() {
                       "max-w-[88%] rounded-2xl px-3 py-2 whitespace-pre-wrap",
                       m.role === "user"
                         ? "bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)]"
-                        : "border border-[var(--border-subtle)] bg-[var(--surface)] text-[var(--foreground)]",
+                        : "border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]",
                     ].join(" ")}
                   >
                     {formatAssistantMarkdownLite(m.content)}
@@ -180,8 +180,8 @@ export function SiteGuideAssistant() {
               ) : null}
             </div>
 
-            <footer className="shrink-0 border-t border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2">
-              <div className="flex items-end gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-1.5 focus-within:ring-2 focus-within:ring-[var(--ring-focus)]">
+            <footer className="shrink-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-2">
+              <div className="flex items-end gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 focus-within:ring-2 focus-within:ring-[var(--ring-focus)]">
                 <textarea
                   ref={inputRef}
                   rows={2}

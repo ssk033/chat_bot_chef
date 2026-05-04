@@ -581,9 +581,9 @@ export default function ChatBotChefPage() {
         }`}
       >
         <header
-          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface)]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/78 ${
+          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/78 ${
             sidebarCollapsed ? "md:left-[72px]" : "md:left-[260px]"
-          } left-0 shadow-[0_1px_0_color-mix(in_srgb,var(--border-subtle)_65%,transparent)]`}
+          } left-0 shadow-[0_1px_0_color-mix(in_srgb,var(--border)_65%,transparent)]`}
         >
           <div className="flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <button
@@ -649,10 +649,10 @@ export default function ChatBotChefPage() {
 
         <div className="flex min-h-0 flex-1 flex-col pt-[calc(3.5rem+1px)]">
           <div className="relative flex min-h-0 flex-1 flex-col bg-[var(--background)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,color-mix(in_srgb,var(--accent-muted)_100%,transparent),transparent)] opacity-90 dark:opacity-70" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,color-mix(in_srgb,var(--accent)_22%,transparent),transparent)] opacity-90 dark:opacity-70" />
 
             <div className="chat-scroll-area relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y">
-              <div className="mx-auto max-w-[760px] space-y-6 px-5 py-8 sm:space-y-8 sm:px-6 sm:py-10">
+              <div className="mx-auto max-w-[760px] space-y-7 px-5 py-8 sm:space-y-9 sm:px-6 sm:py-10">
                 {messages.length === 0 ? (
                   <div className="flex min-h-[min(52dvh,22rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[300px]">
                     <ChefAvatar size={52} sizeSm={56} className="mb-6 shrink-0 !rounded-2xl shadow-md" />

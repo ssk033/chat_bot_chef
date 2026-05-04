@@ -115,7 +115,7 @@ export function FileUpload({ onChange, accept = defaultAccept, multiple = false,
                       damping: 20,
                     }}
                     className={cn(
-                      "relative z-40 flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] group-hover/file:shadow-xl dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)]",
+                      "relative z-40 flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] group-hover/file:shadow-xl dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)]",
                       "shadow-[0px_10px_40px_rgba(15,23,42,0.12)] dark:shadow-[0px_12px_36px_rgba(0,0,0,0.35)]",
                     )}
                   >
@@ -135,14 +135,14 @@ export function FileUpload({ onChange, accept = defaultAccept, multiple = false,
 
                   <motion.div
                     variants={secondaryVariant}
-                    className="pointer-events-none absolute inset-x-0 top-2 z-30 mx-auto flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_42%,var(--border-subtle)_58%)] bg-transparent opacity-0"
+                    className="pointer-events-none absolute inset-x-0 top-2 z-30 mx-auto flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-dashed border-[color-mix(in_srgb,var(--accent)_42%,var(--border)_58%)] bg-transparent opacity-0"
                   />
                 </div>
               </div>
             </>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] px-3 py-3 ring-1 ring-black/[0.04] dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] dark:ring-white/[0.06]">
+              <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] px-3 py-3 ring-1 ring-black/[0.04] dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] dark:ring-white/[0.06]">
                 <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent-muted)_70%,transparent)] text-[var(--accent)]">
                   <IconUpload className="h-5 w-5" stroke={1.75} aria-hidden />
                 </span>
@@ -153,9 +153,9 @@ export function FileUpload({ onChange, accept = defaultAccept, multiple = false,
                   </p>
                   <p className="mt-1 text-[11px] leading-snug text-[var(--muted-text)]">
                     {formatFileSize(file.size)}
-                    <span className="mx-1 text-[var(--border-subtle)]">·</span>
+                    <span className="mx-1 text-[var(--border)]">·</span>
                     {shortMime(file.type)}
-                    <span className="mx-1 text-[var(--border-subtle)]">·</span>
+                    <span className="mx-1 text-[var(--border)]">·</span>
                     <span className="tabular-nums">{new Date(file.lastModified).toLocaleDateString()}</span>
                   </p>
                 </div>

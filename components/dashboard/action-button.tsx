@@ -17,9 +17,8 @@ export function ActionButton({ href, children, variant = "secondary", className 
       <Link
         href={href}
         className={twMerge(
-          "btn-solid inline-flex w-fit items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200",
-          "bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)] shadow-md ring-1 ring-black/[0.06]",
-          "hover:brightness-[1.05] motion-safe:active:scale-[0.97] dark:ring-white/10",
+          "btn-solid inline-flex w-fit items-center justify-center rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-black shadow-sm transition-all duration-200",
+          "hover:shadow-md hover:brightness-105 motion-safe:active:scale-[0.97]",
           className
         )}
       >
@@ -32,9 +31,8 @@ export function ActionButton({ href, children, variant = "secondary", className 
     <Link
       href={href}
       className={twMerge(
-        "inline-flex w-fit items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-medium transition-all duration-200",
-        "border-[color-mix(in_srgb,var(--accent)_32%,var(--border-subtle))] bg-transparent text-[var(--accent)]",
-        "hover:bg-[var(--accent-muted)] motion-safe:active:scale-[0.97]",
+        "inline-flex w-fit items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--accent)] shadow-sm transition-all duration-200",
+        "hover:bg-[color-mix(in_srgb,var(--surface)_88%,var(--accent))] hover:shadow-md motion-safe:active:scale-[0.97]",
         className
       )}
     >

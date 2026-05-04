@@ -71,8 +71,8 @@ export default function MealPlanDetailPage() {
             Saved plans
           </Link>
 
-          <article className="rounded-2xl border border-[color-mix(in_srgb,var(--border-subtle)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-6 shadow-[0_10px_30px_color-mix(in_srgb,var(--foreground)_12%,transparent)] backdrop-blur-xl md:p-8 dark:border-white/[0.09] dark:bg-[color-mix(in_srgb,var(--surface)_76%,transparent)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.42)]">
-            <header className="border-b border-[var(--border-subtle)] pb-6 dark:border-white/[0.06]">
+          <article className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-6 shadow-[0_10px_30px_color-mix(in_srgb,var(--foreground)_12%,transparent)] backdrop-blur-xl md:p-8 dark:border-white/[0.09] dark:bg-[color-mix(in_srgb,var(--surface)_76%,transparent)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.42)]">
+            <header className="border-b border-[var(--border)] pb-6 dark:border-white/[0.06]">
               <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">{plan.planName}</h1>
               <p className="mt-2 text-sm text-[var(--muted-text)]">
                 Last updated {formatWhen(plan.updatedAt)} · {plan.householdSize} people · Created {formatWhen(plan.createdAt)}
@@ -88,7 +88,7 @@ export default function MealPlanDetailPage() {
                 </Link>
                 <Link
                   href={`/meal-plan/create?edit=${plan.id}`}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
                 >
                   <IconPencil size={17} stroke={1.75} aria-hidden />
                   Edit intake
@@ -129,7 +129,7 @@ export default function MealPlanDetailPage() {
               </section>
             </div>
 
-            <p className="mt-8 border-t border-[var(--border-subtle)] pt-6 text-xs text-[var(--muted-text)] dark:border-white/[0.06]">
+            <p className="mt-8 border-t border-[var(--border)] pt-6 text-xs text-[var(--muted-text)] dark:border-white/[0.06]">
               Planner chat uses this intake with <code className="rounded bg-[var(--surface-muted)] px-1 py-0.5 text-[11px]">/api/query</code>.
               Main Chef is separate —{" "}
               <Link href="/chat-bot-chef" className="font-medium text-[var(--accent)] hover:underline">

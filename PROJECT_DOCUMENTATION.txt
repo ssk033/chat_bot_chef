@@ -1,0 +1,310 @@
+================================================================================
+  MEAL-IT!! (chat_bot_chef) — PROJECT DOCUMENTATION
+================================================================================
+  Generated as a plain-text reference for features, architecture, tech stack,
+  deployment, and behaviour. Paths are relative to the repository root
+  `chat_bot_chef/` unless noted otherwise.
+
+--------------------------------------------------------------------------------
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+
+  • Product name (UI): Meal-IT!!
+  • NPM package name: chbot
+  • Purpose: A meal-planning and nutrition web app with an AI “Chef” chat,
+    meal-plan flows, a food-photo analyser (Food Tracker), a simple nutrition
+    log, and a floating site-guide assistant. Recipe exploration uses a
+    PostgreSQL-backed catalogue with optional embeddings for similarity.
+
+  • Credits (as shown in-app): Built by Sanidhya, Rajnish, Sachet, Aayush.
+
+
+--------------------------------------------------------------------------------
+2. TECH STACK
+--------------------------------------------------------------------------------
+
+  Framework & language
+  • Next.js 16 (App Router), React 19
+  • TypeScript 5
+  • Node.js runtime for API routes (explicit `nodejs` where required)
+
+  Styling & UI
+  • Tailwind CSS v4 (`@import "tailwindcss"` in `app/globals.css`)
+  • `@tailwindcss/postcss`
+  • Design tokens via CSS variables (`--background`, `--foreground`,
+    `--surface`, `--accent`, `--muted-text`, etc.) in `app/globals.css`
+    with `.dark` class on `<html>` for theme switching
+  • Component helpers: `clsx`, `tailwind-merge` (`cn()` in `lib/utils.ts`)
+  • Icons: `@tabler/icons-react`
+  • Motion / animation: `motion` (e.g. `motion/react` in file upload UI)
+
+  Data & backend integration
+  • PostgreSQL via Prisma ORM (`prisma/schema.prisma`)
+  • `DATABASE_URL` — Neon / Postgres connection string
+  • Recipe embeddings column uses Postgres `vector` type (`Unsupported` in Prisma)
+  • Optional external ML / Food AI:
+      - HTTP service default `http://127.0.0.1:8788` — overridden by
+        `FOOD_AI_SERVICE_URL`
+      - Started locally via `npm run food-ai:dev` (Python uvicorn under
+        `ml-models/food-ai-server/` when present)
+  • Google Generative AI (`@google/generative-ai`):
+      - Chef-adjacent flows, meal planner `/api/query`, site guide
+      - Food Tracker refinement via `lib/gemini-food-vision.ts`
+      - Env: `GEMINI_API_KEY`, optional `GEMINI_MODEL`
+
+  Client-side persistence (browser)
+  • Auth profile: `localStorage` key `meal_it_user` (`lib/client-auth.ts`)
+  • Chef chat: anonymous user key + sessions/messages in Postgres;
+    header `x-chef-anonymous-key` (`lib/chef-auth.ts`)
+  • Theme: `localStorage` key `chef-theme`, boot script in `app/layout.tsx`
+  • Meal-plan AI saved drafts: `lib/meal-plan-ai-saves.ts`
+      - Legacy key `meal_it_saved_plans`; versioning helpers for planner chat
+  • Food Tracker history (thumbnails + last result snapshot):
+      - `lib/food-tracker-history.ts` → key `meal-it-food-tracker-history-v1`
+
+  Tooling
+  • ESLint 9 + `eslint-config-next`
+  • Build: `next build` (Turbopack as per Next 16 defaults)
+  • Fonts: `next/font/google` — Geist Sans & Geist Mono (`app/layout.tsx`)
+
+  Optimisations (Next config)
+  • `experimental.optimizePackageImports` for `@tabler/icons-react`, `motion`
+  • `poweredByHeader: false`
+  • Image optimisation: AVIF/WebP, cache TTL, `remotePatterns` for Unsplash
+
+
+--------------------------------------------------------------------------------
+3. REPOSITORY LAYOUT (HIGH LEVEL)
+--------------------------------------------------------------------------------
+
+  app/                  App Router pages, layouts, global CSS
+  components/           React components (navbar, dashboard, chat, meal-plan,
+                        food-tracker sidebar, UI primitives, site guide)
+  lib/                  Shared utilities (auth, prisma, embeddings, Gemini,
+                        meal-plan saves, food-tracker history, sanitization)
+  prisma/               Schema & migrations target Postgres
+  public/               Static assets (dashboard backgrounds, food-tracker bg PNGs)
+  scripts/              Node helpers (DB load/check/clear, food-ai dev runner)
+  ml-models/            Python Food AI server (when present; uvicorn app)
+  dataset/, RecipeModel/ Optional local data / model artefacts (project-specific)
+
+
+--------------------------------------------------------------------------------
+4. DATABASE MODELS (PRISMA)
+--------------------------------------------------------------------------------
+
+  Recipe
+  • Core recipe fields (title, ingredients, instructions, times, cuisine, tags,
+    url, image, yield) + relation to Embedding
+
+  Embedding
+  • `recipeId` (unique), `vector` — pgvector / similarity search support
+
+  User (Chef anonymity bridge)
+  • `anonymousKey` (unique), `displayName`, chat sessions
+
+  ChatSession / ChatMessage
+  • Persisted Chef chat threads for anonymous-key users
+
+  FoodAiPredictionReview
+  • Stores Food Tracker user feedback (email, prediction, rating, optional
+    correction text, backend label, demo-low-confidence flag)
+
+
+--------------------------------------------------------------------------------
+5. APP ROUTES (USER-FACING PAGES)
+--------------------------------------------------------------------------------
+
+  /                         Landing / marketing home (`app/page.tsx`)
+                              Hero, feature grid (“Talk to Chef”, meal plan,
+                              nutrition tracker, food recognition, saved meals),
+                              “How it works”, CTAs to register / login / chef
+
+  /auth/login               Email capture login flow (stores user in localStorage)
+  /auth/register            Registration entry
+
+  /dashboard                Quick actions after login: meal plan create/saved,
+                              nutrition tracker, food tracker; link to Chef chat
+
+  /chat-bot-chef            Full-screen Chef assistant
+                              • Sidebar: sessions, new chat, rename user, collapse
+                              • Messages persisted via `/api/sessions`
+                              • Voice: Web Speech API where supported; browser TTS
+                              • Recipe-shaped replies parsed (`parse-recipe.ts`)
+                                with collapsible `RecipeCard`
+
+  /meal-plan/create         Intake form → redirects into planner flow / chat with
+                              query params describing household, ingredients, etc.
+
+  /meal-plan/chat           Dedicated planner chat (calls `/api/query`);
+                              can save last bot reply to localStorage saved plans
+
+  /meal-plan/saved          List / open locally saved planner outputs
+
+  /meal-plan/[id]           Dynamic meal-plan detail route
+
+  /meal-plan/ai/[id]        Full-view saved AI planner reply
+
+  /food-tracker             Authenticated photo upload → `/api/food-ai/predict`
+                              Shows dish + macros + confidence UI + optional review
+                              modal posting to `/api/food-tracker/reviews`
+                              Right column: local history (thumbnail + snapshot)
+
+  /nutrition/tracker        Simple client-only macro log (add rows, totals);
+                              not wired to a backend API
+
+
+--------------------------------------------------------------------------------
+6. API ROUTES (SERVER)
+--------------------------------------------------------------------------------
+
+  POST /api/food-ai/predict
+  • Multipart image → proxies to Python Food AI `POST {UPSTREAM}/predict`
+    (`FOOD_AI_SERVICE_URL` or default localhost:8788).
+  • Reads CNN confidence from flexible keys: confidence, softmax_confidence,
+    score, cnn_confidence, prob, probability.
+  • Rule: if CNN confidence ≥ 0.65 → return CNN JSON (sanitized fields).
+    If < 0.65 → call Gemini vision (`lib/gemini-food-vision.ts`) on same image;
+    if Gemini succeeds, return dish/macros/confidence from Gemini (CNN demo
+    hints preserved where relevant).
+  • If CNN unreachable or non-OK HTTP / bad JSON → tries Gemini-only fallback.
+  • Requires `GEMINI_API_KEY` in deployment env for cloud without local CNN.
+
+  POST /api/food-tracker/reviews
+  • Persists `FoodAiPredictionReview` rows (Prisma).
+
+  POST /api/query
+  • Large route: recipe RAG / Gemini-powered replies, embedding generation
+    (`lib/embedding-model.ts`), Prisma recipe queries. Used by Chef-related
+    flows and meal intelligence.
+
+  GET/POST /api/sessions
+  GET      /api/sessions/[sessionId]
+  POST     /api/sessions/[sessionId]/messages
+  • Anonymous chef sessions backed by Prisma `User` + `ChatSession` +
+    `ChatMessage`; keyed via `x-chef-anonymous-key`.
+
+  POST /api/site-guide
+  • Site-wide floating assistant (`SiteGuideAssistant`): Gemini + pathname +
+    message history (`lib/site-guide-gemini.ts`, `lib/site-guide-prompt.ts`).
+
+  GET/POST /api/user
+  POST /api/user/bootstrap
+  • User bootstrap / anonymous identity alignment for chef flows.
+
+
+--------------------------------------------------------------------------------
+7. KEY FEATURES — HOW THEY WORK
+--------------------------------------------------------------------------------
+
+  7.1 Authentication (lightweight)
+  • Not OAuth-heavy in client auth: email stored under `meal_it_user`.
+  • Protected pages gate with `getStoredUser()` + redirect to login with `next`.
+
+  7.2 Theme
+  • `ThemeToggle` flips `document.documentElement.classList` (`dark`).
+  • Initial theme from localStorage + `prefers-color-scheme` (inline script).
+
+  7.3 Chef chat
+  • Client loads/creates anonymous key, syncs sessions from API.
+  • Messages rendered with user initials avatar vs Chef avatar.
+  • Composer: attachments stub; mic; send; TTS play/stop.
+
+  7.4 Meal planner
+  • Create form builds URL params → `/meal-plan/chat` seeds first `/api/query`
+    turn with structured prompt from intake.
+  • Subsequent sends POST JSON `{ message }` to `/api/query`.
+  • “Save latest reply” appends to localStorage list for reuse.
+
+  7.5 Food Tracker
+  • Client-only preview blob URL; FileUpload component (dropzone + motion).
+  • POST FormData `image` to predict API; displays metrics + confidence bands.
+  • Review modal POSTs structured feedback (no image stored server-side per copy).
+  • History: compressed JPEG thumbnails in localStorage, capped list length.
+
+  7.6 Nutrition tracker
+  • Pure React state; totals computed with `useMemo`; no server persistence.
+
+  7.7 Site Guide (global widget)
+  • Lazy-loaded client bundle (`site-guide-assistant-root.tsx` dynamic import,
+    `ssr: false`) to reduce initial JS.
+  • Floating launcher bottom-right; minimise / close; Escape closes.
+  • Gemini-backed `/api/site-guide`; welcome message stored client-side with
+    stable message IDs.
+
+  7.8 Recipe / embedding pipeline (backend)
+  • `lib/embedding-model.ts`: optional local Python script inference OR
+    Hugging Face Inference API fallback; caching & timeouts.
+  • Turbopack: `path.join(/* turbopackIgnore: true */ process.cwd(), ...)` to
+    avoid tracing entire repo during NFT.
+
+
+--------------------------------------------------------------------------------
+8. ENVIRONMENT VARIABLES (TYPICAL)
+--------------------------------------------------------------------------------
+
+  DATABASE_URL            Postgres connection (Prisma)
+  GEMINI_API_KEY          Google AI (query, site guide, food vision fallback)
+  GEMINI_MODEL            Optional override for Gemini model id
+  FOOD_AI_SERVICE_URL     Optional; default http://127.0.0.1:8788
+  FOOD_AI_PORT / HOST     Used by `scripts/food-ai-dev.mjs` locally
+  VERCEL / NEXT_PUBLIC_*  Standard deployment introspection where used
+
+
+--------------------------------------------------------------------------------
+9. NPM SCRIPTS
+--------------------------------------------------------------------------------
+
+  npm run dev               Next dev server
+  npm run dev:webpack       Next dev with webpack (alternate)
+  npm run build             Production build
+  npm run start             Production server
+  npm run lint              ESLint
+  npm run verify            Lint (zero warnings) + build
+  postinstall               prisma generate
+  npm run load / check-db / clear-db   TSX DB utilities (scripts/)
+  npm run food-ai:dev       Spawn Python uvicorn for Food AI (needs venv)
+  npm run food-ai:venv(:win)           Setup Python venv for food-ai
+  npm run food-ai:init-demo-model      Demo model helper (Node wrapper)
+
+
+--------------------------------------------------------------------------------
+10. DEPLOYMENT NOTES
+--------------------------------------------------------------------------------
+
+  • Vercel / Node hosts: set `DATABASE_URL`, `GEMINI_API_KEY`.
+  • Local CNN (`127.0.0.1:8788`) is NOT reachable from cloud → predict route
+    falls back to Gemini vision when key present; host CNN separately and set
+    `FOOD_AI_SERVICE_URL` if full CNN + 65% gating is required in production.
+  • Ensure Postgres supports `vector` extension if embeddings are used.
+  • `npm run build` should pass before ship; `optimizePackageImports` is on.
+
+
+--------------------------------------------------------------------------------
+11. NOTABLE FILES (QUICK INDEX)
+--------------------------------------------------------------------------------
+
+  app/layout.tsx                    Root layout, fonts, theme script, Site Guide root
+  app/globals.css                   Tailwind + CSS variables + utilities
+  components/app-navbar.tsx         Global nav, Talk to Chef, auth CTAs
+  components/site-guide-assistant.tsx / site-guide-assistant-root.tsx
+  components/chat/*                 Chat bubble, input, recipe card, parsing
+  components/food-tracker/*         History sidebar UI
+  components/ui/file-upload.tsx     Drag-drop upload (Food Tracker)
+  lib/gemini-food-vision.ts         Gemini meal-photo JSON extraction
+  lib/food-tracker-history.ts       localStorage history CRUD + thumbnails
+  lib/sanitize-chat-display.ts      Display-only dash cleanup (assistant text)
+  app/api/food-ai/predict/route.ts  CNN + Gemini orchestration
+
+
+--------------------------------------------------------------------------------
+12. RELATED MATERIAL OUTSIDE THIS APP FOLDER
+--------------------------------------------------------------------------------
+
+  The wider monorepo (`miniproject/`) may contain notebooks and datasets under
+  paths such as `Food-Recognition-and-Calorie-Estimation/` — training /
+  experimentation artefacts complementing the Food Tracker story.
+
+================================================================================
+  END OF DOCUMENTATION
+================================================================================

@@ -38,13 +38,13 @@ export function FoodTrackerHistorySidebar({
   return (
     <aside
       className={cn(
-        "rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06]",
+        "rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06]",
         "flex max-h-[min(70vh,560px)] flex-col overflow-hidden lg:max-h-[calc(100vh-8rem)]",
         className,
       )}
       aria-label="Upload history"
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
           <IconPhoto className="h-5 w-5 shrink-0 text-[var(--accent)]" stroke={1.75} aria-hidden />
           <div className="min-w-0">
@@ -79,8 +79,8 @@ export function FoodTrackerHistorySidebar({
                     className={cn(
                       "group flex gap-3 rounded-xl border p-2 transition",
                       active
-                        ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent-muted)_55%,transparent)] ring-1 ring-[var(--accent)]/15"
-                        : "border-transparent bg-[color-mix(in_srgb,var(--surface-muted)_45%,transparent)] hover:border-[var(--border-subtle)] hover:bg-[color-mix(in_srgb,var(--surface-muted)_72%,transparent)]",
+                        ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] bg-[color-mix(in_srgb,var(--accent-muted)_55%,transparent)] ring-1 ring-[var(--accent)]/15"
+                        : "border-transparent bg-[color-mix(in_srgb,var(--surface-muted)_45%,transparent)] hover:border-[var(--border)] hover:bg-[color-mix(in_srgb,var(--surface-muted)_72%,transparent)]",
                     )}
                   >
                     <button
