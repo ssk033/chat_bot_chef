@@ -9,6 +9,7 @@ import { FormCard } from "@/components/meal-plan/form-card";
 import { InputField } from "@/components/meal-plan/input-field";
 import { MealPlanPageBackdrop } from "@/components/meal-plan/meal-plan-page-backdrop";
 import { PrimaryButton } from "@/components/meal-plan/primary-button";
+import { Button } from "@/components/ui/button";
 import { TextAreaField } from "@/components/meal-plan/textarea-field";
 import { buildMealPlanChatQuery } from "@/lib/meal-plan-chat-query";
 import { setMealPlanChatSession } from "@/lib/meal-plan-ai-saves";
@@ -205,15 +206,16 @@ function CreateMealPlanForm({ editId }: { editId: string | null }) {
               ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-                <button
+                <Button
                   type="button"
                   onClick={continueToPlannerChat}
                   disabled={!isValid}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-medium text-white shadow-[0_0_22px_-4px_color-mix(in_srgb,var(--icon-green)_38%,transparent)] ring-1 ring-black/[0.06] transition-all duration-200 hover:brightness-[1.08] motion-safe:active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45 dark:ring-white/10"
+                  variant="primary"
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-6 py-3 text-sm font-medium shadow-sm disabled:pointer-events-none disabled:opacity-45"
                 >
                   <IconMessages size={18} stroke={1.75} aria-hidden />
                   Continue to planner chat
-                </button>
+                </Button>
                 <PrimaryButton type="submit" disabled={!isValid} className="sm:max-w-[200px]">
                   <span className="inline-flex items-center justify-center gap-2">
                     <IconBookmark size={18} stroke={1.75} aria-hidden />

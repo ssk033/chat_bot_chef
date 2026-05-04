@@ -10,7 +10,7 @@ export function TrackerCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm transition-all duration-200 hover:shadow-md",
+        "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 shadow-sm transition-all duration-200 hover:shadow-md",
         className
       )}
     >

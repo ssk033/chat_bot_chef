@@ -60,19 +60,19 @@ export default function HomePage() {
       <main>
         <HeroSection />
 
-        <section className="relative border-t border-[var(--border)] py-16 sm:py-20">
+        <section className="relative border-t border-[var(--border-subtle)] py-16 sm:py-20">
           <div
             className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-[color-mix(in_srgb,var(--foreground)_6%,transparent)] to-[color-mix(in_srgb,var(--foreground)_10%,transparent)] opacity-30 dark:opacity-45"
             aria-hidden
           />
           <div className="home-fade-up home-fade-delay-1 relative mx-auto w-full max-w-7xl px-6">
-            <h2 className="text-center text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
-              Key Features
+            <h2 className="text-center text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">
+              Key features
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-[var(--muted-text)] sm:text-base">
               Chat, planning, tracking, camera cues, and saved favorites stay aligned in one Meal-IT!! flow.
             </p>
-            <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 xl:grid-cols-5 xl:items-stretch">
+            <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:items-stretch">
               {features.map((f) => (
                 <FeatureCard key={f.title} title={f.title} description={f.description} iconId={f.iconId} />
               ))}
@@ -80,14 +80,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="relative mx-auto w-full max-w-6xl px-6 py-16 sm:py-20">
+        <section className="relative mx-auto w-full max-w-7xl px-6 py-16 sm:py-20">
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)] to-transparent"
             aria-hidden
           />
           <div className="home-fade-up home-fade-delay-2">
-            <h2 className="text-center text-3xl font-bold tracking-tight text-[var(--foreground)] sm:text-4xl">
-              How It Works
+            <h2 className="text-center text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">
+              How it works
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-[var(--muted-text)] sm:text-base">
               Three simple steps to get personalized meal plans.

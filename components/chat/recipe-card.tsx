@@ -22,7 +22,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
   const displayTitle = sanitizeAssistantDisplayText(recipe.title?.trim() || "Recipe");
 
   return (
-    <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm transition hover:shadow-md sm:p-6">
+    <div className="mt-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-5 shadow-sm transition-all duration-200 hover:shadow-md sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <h3 className="text-xl font-semibold leading-snug tracking-tight text-[var(--foreground)]">{displayTitle}</h3>
         {badge ? (

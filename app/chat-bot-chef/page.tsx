@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconLayoutDashboard, IconLoader2, IconMenu2 } from "@tabler/icons-react";
+import { IconLayoutDashboard, IconMessageCircle, IconMenu2 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ChatSidebar, type SessionRow } from "@/components/chat-sidebar";
 import { CHEF_ANONYMOUS_KEY_HEADER } from "@/lib/chef-auth";
@@ -15,6 +15,8 @@ import {
   type ChatMessageModel,
 } from "@/components/chat/chat-message";
 import { ChefAvatar } from "@/components/chef-avatar";
+import { ChatLoadingShell } from "@/components/chat/chat-loading-shell";
+import { ButtonLink } from "@/components/ui/button";
 
 const LS_DISPLAY_NAME = "chef_display_name";
 const LS_SIDEBAR_COLLAPSED = "chef_sidebar_collapsed";
@@ -551,11 +553,7 @@ export default function ChatBotChefPage() {
   const hasBotReply = messages.filter((m) => m.role === "bot").length > 0;
 
   if (!authChecked || !ready) {
-    return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--background)] text-[var(--muted-text)]">
-        <IconLoader2 size={28} className="animate-spin" aria-hidden />
-      </div>
-    );
+    return <ChatLoadingShell />;
   }
 
   return (
@@ -581,14 +579,14 @@ export default function ChatBotChefPage() {
         }`}
       >
         <header
-          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/78 ${
+          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] backdrop-blur-md supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--surface)_82%,transparent)] ${
             sidebarCollapsed ? "md:left-[72px]" : "md:left-[260px]"
-          } left-0 shadow-[0_1px_0_color-mix(in_srgb,var(--border)_65%,transparent)]`}
+          } left-0 shadow-[0_1px_0_color-mix(in_srgb,var(--border-subtle)_75%,transparent)] transition-colors duration-200`}
         >
-          <div className="flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-[760px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8 xl:max-w-[840px]">
             <button
               type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--foreground)] transition-all duration-200 hover:bg-[var(--surface-muted)] motion-safe:active:scale-95 md:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] text-[var(--foreground)] transition-all duration-200 hover:bg-[var(--surface-muted)] motion-safe:active:scale-95 md:hidden"
               onClick={() => setMobileSidebarOpen(true)}
               aria-label="Open sidebar"
             >
@@ -612,7 +610,7 @@ export default function ChatBotChefPage() {
             <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
               <Link
                 href="/dashboard"
-                className="glow-pill inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:opacity-95 motion-safe:active:scale-[0.98]"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--foreground)_6%)] motion-safe:active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
               >
                 <IconLayoutDashboard size={18} stroke={1.75} aria-hidden />
                 Dashboard
@@ -629,8 +627,8 @@ export default function ChatBotChefPage() {
                   <span className="truncate sm:whitespace-normal">Ready</span>
                 </span>
               ) : (
-                <span className="inline-flex max-w-[10rem] items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 sm:max-w-none">
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span className="inline-flex max-w-[10rem] items-center gap-1.5 text-xs text-[var(--muted-text)] sm:max-w-none">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[color-mix(in_srgb,var(--muted-text)_65%,var(--border)_35%)]" />
                   <span className="truncate sm:whitespace-normal">Limited</span>
                 </span>
               )}
@@ -640,7 +638,7 @@ export default function ChatBotChefPage() {
 
         {chatStorageError ? (
           <div
-            className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm leading-relaxed text-amber-950 dark:text-amber-100 sm:px-6"
+            className="shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2 text-center text-sm leading-relaxed text-[var(--muted-text)] sm:px-6"
             role="status"
           >
             {chatStorageError}
@@ -652,16 +650,17 @@ export default function ChatBotChefPage() {
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,color-mix(in_srgb,var(--accent)_22%,transparent),transparent)] opacity-90 dark:opacity-70" />
 
             <div className="chat-scroll-area relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y">
-              <div className="mx-auto max-w-[760px] space-y-7 px-5 py-8 sm:space-y-9 sm:px-6 sm:py-10">
+              <div className="mx-auto max-w-[760px] space-y-4 px-5 py-8 sm:px-6 sm:py-10 xl:max-w-[840px]">
                 {messages.length === 0 ? (
-                  <div className="flex min-h-[min(52dvh,22rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[300px]">
-                    <ChefAvatar size={52} sizeSm={56} className="mb-6 shrink-0 !rounded-2xl shadow-md" />
-                    <h2 className="max-w-md text-lg font-semibold tracking-tight text-[var(--foreground)] sm:text-xl">
-                      What would you like to cook today?
-                    </h2>
-                    <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--muted-text)] sm:text-[15px] sm:leading-7">
-                      Ask for recipes, swaps, or meal ideas. Try: &ldquo;What can I make with chicken and rice?&rdquo;
+                  <div className="flex min-h-[min(52dvh,22rem)] flex-col items-center justify-center gap-3 px-2 text-center sm:min-h-[300px]">
+                    <IconMessageCircle className="h-12 w-12 text-[var(--muted-text)] opacity-50" stroke={1.25} aria-hidden />
+                    <h2 className="text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-lg">No data yet</h2>
+                    <p className="max-w-md text-sm leading-relaxed text-[var(--muted-text)]">
+                      Start the conversation below—ask for recipes, ingredient swaps, or a meal plan tailored to what you have.
                     </p>
+                    <ButtonLink href="/dashboard" variant="secondary" className="mt-2">
+                      Browse dashboard
+                    </ButtonLink>
                   </div>
                 ) : (
                   <>

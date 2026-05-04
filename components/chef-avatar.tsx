@@ -33,10 +33,10 @@ export function ChefAvatar({ size = 32, sizeSm, interactive = false, className }
   return (
     <span
       className={twMerge(
-        "inline-flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[var(--accent-muted)] text-[var(--accent)] shadow-sm ring-1 ring-black/[0.05] dark:border-white/10 dark:ring-white/[0.08]",
+        "inline-flex shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface-muted))] text-[var(--accent)] shadow-sm ring-1 ring-[var(--border-subtle)]",
         sizeSm != null && "h-[var(--chef-av)] w-[var(--chef-av)] sm:h-[var(--chef-av-sm)] sm:w-[var(--chef-av-sm)]",
         interactive &&
-          "cursor-default transition-all duration-200 motion-safe:hover:scale-105 motion-safe:hover:bg-[color-mix(in_srgb,var(--accent-muted)_100%,var(--icon-green)_18%)] motion-safe:active:scale-[0.98]",
+          "cursor-default transition-all duration-200 motion-safe:hover:scale-105 motion-safe:hover:bg-[color-mix(in_srgb,var(--accent)_18%,var(--surface-muted))] motion-safe:active:scale-[0.98]",
         className
       )}
       style={style}
@@ -57,7 +57,7 @@ export function UserAvatar({ initials, className }: UserAvatarProps) {
   return (
     <span
       className={twMerge(
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--user-bubble-bg)] text-[11px] font-semibold text-[var(--user-bubble-fg)] shadow-sm ring-1 ring-black/10 dark:ring-white/10",
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--user-bubble-bg)] text-[11px] font-semibold text-[var(--user-bubble-fg)] shadow-sm ring-1 ring-[var(--border-subtle)]",
         className
       )}
       aria-hidden

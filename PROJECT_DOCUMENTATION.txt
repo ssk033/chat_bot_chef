@@ -1,9 +1,12 @@
 ================================================================================
   MEAL-IT!! (chat_bot_chef) — PROJECT DOCUMENTATION
 ================================================================================
-  Generated as a plain-text reference for features, architecture, tech stack,
-  deployment, and behaviour. Paths are relative to the repository root
-  `chat_bot_chef/` unless noted otherwise.
+  Plain-text reference for features, architecture, tech stack, deployment,
+  and behaviour. Paths are relative to `chat_bot_chef/` unless noted otherwise.
+  Last aligned with codebase: 2026-05-04 — documentation reflects UI polish:
+  primitives, loading skeletons, shared page backdrops (dashboard + food tracker),
+  navbar borders, and primary control text tokens (`text-[var(--foreground)]` on
+  accent fills, not hardcoded black).
 
 --------------------------------------------------------------------------------
 1. PROJECT OVERVIEW
@@ -31,15 +34,60 @@
   Styling & UI
   • Tailwind CSS v4 (`@import "tailwindcss"` in `app/globals.css`)
   • `@tailwindcss/postcss`
-  • Design tokens via CSS variables (`--background`, `--foreground`,
-    `--surface`, `--accent`, `--muted-text`, etc.) in `app/globals.css`
-    with `.dark` class on `<html>` for theme switching
+  • Design tokens via CSS variables in `app/globals.css`: **`--background`,
+    `--foreground`, `--surface`, `--surface-muted`, `--accent`,
+    `--muted-text`, `--border`, `--border-subtle`, `--ring-focus`** are the
+    primary palette for layouts/components; additional helpers (`--accent-muted`,
+    `--user-bubble-*`, `--icon-green*`, etc.) remain for legacy utilities
+    (e.g. `.glow-pill`, `.chef-icon-badge`). `.dark` on `<html>` toggles dark mode.
+  • **Border contrast (`app/globals.css`)**: `:root` uses **`--border-subtle`**
+    and a slightly stronger **`--border`** (e.g. slate alpha ~0.12 vs ~0.2) so
+    emphasis outlines remain distinct in light mode. **`html.dark`** sets both
+    from **`rgba(255,255,255,…)`** (subtle ~0.12, default ~0.18) so controls stay
+    visible on **`--background` / `--surface`** without Tailwind grey utilities.
+  • Shared UI primitives (`components/ui/`):
+      - `card.tsx` — `SurfaceCard` (rounded-2xl, `--surface`, `--border-subtle`,
+        hover shadow) for dashboards, Food Tracker panels, etc.
+      - `button.tsx` — `Button`, `ButtonLink`, exported `buttonClass()`:
+        all variants share a **1px `border`** using tokens only — **primary** =
+        **`border-[var(--border)]`** on **`bg-[var(--accent)]`** +
+        **`text-[var(--foreground)]`** (readable in light and dark); light hover
+        polish (**`hover:opacity-90`**, **`motion-safe:hover:scale-[1.02]`**) on
+        primary; **secondary** / **ghost** use token borders + muted fills /
+        transparent bg with similar subtle hover motion.
+      - `input.tsx` — `inputClass`, `Input`, `Textarea` for ring-focused fields.
+      - `skeleton.tsx` — `Skeleton`: **`animate-pulse`** + **`bg-[var(--surface-muted)]`**
+        for loading placeholders (dashboard gate, food-tracker result panel, Chef
+        typing indicator lines, chat bootstrap shell).
+  • **Full-bleed themed backgrounds** (`/dashboard` and **`/food-tracker`**): identical
+    pattern — stacked **`next/image`** layers for light/dark art (**`dashboard-bg-*.png`**
+    with onError fallback to the legacy food PNG paths), image opacity **`~0.52`** on the
+    active theme, then a scrim **`color-mix(in_srgb, var(--background) 48%, transparent)`**
+    (light) / **`54%`** (dark). Do **not** use **`var(--foreground)`** in that scrim: it
+    tints dark mode with near-white and looks wrong over dark photography.
+  • Layout conventions used across shell pages: horizontal **`max-w-7xl mx-auto px-6`**,
+    vertical rhythm often **`gap-8`** between major sections / **`gap-6`** in grids;
+    typography leans **`text-xl font-semibold`** for page titles, **`text-sm` +
+    `--muted-text`** for supporting body copy (`leading-relaxed` where useful).
+  • **`components/app-navbar.tsx`**: sticky top bar; **`usePathname`** highlights the
+    active route (`border-[var(--border)]` + **`--surface-muted`** bg vs inactive
+    **`border-[var(--border-subtle)]`** + transparent bg); text links and Log out
+    share that chrome; **Get started** uses **`ButtonLink`** **primary**. **`theme-toggle.tsx`**
+    uses the same **`--border-subtle`** outline + hover **`--surface-muted`** so the icon
+    control matches adjacent nav pills.
+  • Presentation avoids Tailwind default greys/slates and semantic reds/greens in
+    JSX—prefer **`color-mix(in_srgb, var(--foreground|accent|muted-text) …)`**
+    for overlays, badges, and states unless a deliberate accent emphasis is needed.
   • Component helpers: `clsx`, `tailwind-merge` (`cn()` in `lib/utils.ts`)
   • Icons: `@tabler/icons-react`
   • Motion / animation: `motion` (e.g. `motion/react` in file upload UI)
 
   Data & backend integration
   • PostgreSQL via Prisma ORM (`prisma/schema.prisma`)
+  • `lib/prisma.ts` — singleton `PrismaClient` (dev global) and
+    `withPrismaReconnect()` to retry once after transient disconnects
+    (idle pooler closes, network blips); used by Chef sessions, bootstrap,
+    Food Tracker reviews, and PATCH display name
   • `DATABASE_URL` — Neon / Postgres connection string
   • Recipe embeddings column uses Postgres `vector` type (`Unsupported` in Prisma)
   • Optional external ML / Food AI:
@@ -79,7 +127,9 @@
 
   app/                  App Router pages, layouts, global CSS
   components/           React components (navbar, dashboard, chat, meal-plan,
-                        food-tracker sidebar, UI primitives, site guide)
+                        nutrition tracker widgets, food-tracker sidebar,
+                        site guide); **`components/ui/`** houses reusable Card /
+                        Button / Input primitives
   lib/                  Shared utilities (auth, prisma, embeddings, Gemini,
                         meal-plan saves, food-tracker history, sanitization)
   prisma/               Schema & migrations target Postgres
@@ -124,14 +174,28 @@
   /auth/register            Registration entry
 
   /dashboard                Quick actions after login: meal plan create/saved,
-                              nutrition tracker, food tracker; link to Chef chat
+                              nutrition tracker, food tracker; link to Chef chat.
+                              Unauthorized gate shows **`DashboardLoadingSkeleton`**
+                              (navbar + skeleton hero + card grid), not plain text.
 
   /chat-bot-chef            Full-screen Chef assistant
                               • Sidebar: sessions, new chat, rename user, collapse
                               • Messages persisted via `/api/sessions`
                               • Voice: Web Speech API where supported; browser TTS
-                              • Recipe-shaped replies parsed (`parse-recipe.ts`)
-                                with collapsible `RecipeCard`
+                              • Recipe-shaped replies parsed by
+                                `components/chat/parse-recipe.ts` with
+                                collapsible `RecipeCard`
+                              • UI: assistant bubbles use **`--surface-muted`** +
+                                subtle border; user bubbles **`--accent`** +
+                                **`text-[var(--foreground)]`**; plain-message
+                                columns **`max-w-[70%]`** (wider when a parsed
+                                **`RecipeCard`** is shown); message stack spacing
+                                **`space-y-4`**; composer **`rounded-2xl`** shell,
+                                border **`--border`**, **`--ring-focus`** on focus;
+                                empty thread: icon + “No data yet” + CTA
+                                **`ButtonLink`**. Initial load: **`ChatLoadingShell`**
+                                skeleton (not a lone spinner). Assistant plain text
+                                sanitised via `lib/sanitize-chat-display.ts`
 
   /meal-plan/create         Intake form → redirects into planner flow / chat with
                               query params describing household, ingredients, etc.
@@ -139,7 +203,10 @@
   /meal-plan/chat           Dedicated planner chat (calls `/api/query`);
                               can save last bot reply to localStorage saved plans
 
-  /meal-plan/saved          List / open locally saved planner outputs
+  /meal-plan/saved          List / open locally saved planner outputs; empty
+                              sections use **`SurfaceCard`** + icon + **`ButtonLink`**
+                              CTAs; accent actions use **`Button` / `ButtonLink`**
+                              primitives (not raw **`text-black`** links).
 
   /meal-plan/[id]           Dynamic meal-plan detail route
 
@@ -149,9 +216,20 @@
                               Shows dish + macros + confidence UI + optional review
                               modal posting to `/api/food-tracker/reviews`
                               Right column: local history (thumbnail + snapshot)
+                              • Layout uses **`SurfaceCard`** + shared **`Button`**;
+                              status/confidence styling is token-based (no raw
+                              Tailwind “traffic light” colours in JSX)
+                              • Background/scrim matches **`/dashboard`** (see
+                              **Full-bleed themed backgrounds** above).
+                              • Result panel: skeleton while analysing; empty state
+                                icon + “No data yet” + scroll CTA to upload;
+                                dish **`text-lg font-semibold`**; calories row +
+                                **`grid-cols-3`** macros; compact confidence badge.
+                              • Review modal optional fields use shared **`inputClass`**.
 
-  /nutrition/tracker        Simple client-only macro log (add rows, totals);
-                              not wired to a backend API
+  /nutrition/tracker        Macro log dashboard: client-only state (add rows,
+                              totals); styled via `components/nutrition/*`;
+                              no backend persistence API
 
 
 --------------------------------------------------------------------------------
@@ -175,22 +253,33 @@
 
   POST /api/query
   • Large route: recipe RAG / Gemini-powered replies, embedding generation
-    (`lib/embedding-model.ts`), Prisma recipe queries. Used by Chef-related
-    flows and meal intelligence.
+    (`lib/embedding-model.ts`), Prisma recipe queries. Used by meal planner
+    `/meal-plan/chat` and related flows.
 
-  GET/POST /api/sessions
-  GET      /api/sessions/[sessionId]
-  POST     /api/sessions/[sessionId]/messages
-  • Anonymous chef sessions backed by Prisma `User` + `ChatSession` +
-    `ChatMessage`; keyed via `x-chef-anonymous-key`.
+  GET /api/sessions
+  POST /api/sessions
+  • List or create chat sessions for the user identified by
+    `x-chef-anonymous-key`.
+
+  GET /api/sessions/[sessionId]
+  DELETE /api/sessions/[sessionId]
+  • GET: session title + messages (pagination: `take`, `cursor` query params).
+  • DELETE: remove session when it belongs to that anonymous key.
+
+  POST /api/sessions/[sessionId]/messages
+  • Append batched messages (`entries` array); may derive session title from
+    the first user message.
 
   POST /api/site-guide
   • Site-wide floating assistant (`SiteGuideAssistant`): Gemini + pathname +
     message history (`lib/site-guide-gemini.ts`, `lib/site-guide-prompt.ts`).
 
-  GET/POST /api/user
+  PATCH /api/user
+  • Updates Chef anonymous user `displayName` (requires `x-chef-anonymous-key`).
+
   POST /api/user/bootstrap
-  • User bootstrap / anonymous identity alignment for chef flows.
+  • Creates or upserts `User` from JSON `anonymousKey` (and optional name);
+    call before Chef APIs expect an existing user row.
 
 
 --------------------------------------------------------------------------------
@@ -204,6 +293,8 @@
   7.2 Theme
   • `ThemeToggle` flips `document.documentElement.classList` (`dark`).
   • Initial theme from localStorage + `prefers-color-scheme` (inline script).
+  • The toggle button’s border/hover/focus matches global nav token styling
+    (`--border-subtle`, `--surface-muted`, `--ring-focus`).
 
   7.3 Chef chat
   • Client loads/creates anonymous key, syncs sessions from API.
@@ -224,6 +315,8 @@
 
   7.6 Nutrition tracker
   • Pure React state; totals computed with `useMemo`; no server persistence.
+  • UI built from `components/nutrition/*` (cards, stats, inputs) aligned with
+    the global Meal-IT palette (`--border-subtle`, `--surface-muted` stats rows).
 
   7.7 Site Guide (global widget)
   • Lazy-loaded client bundle (`site-guide-assistant-root.tsx` dynamic import,
@@ -237,6 +330,22 @@
     Hugging Face Inference API fallback; caching & timeouts.
   • Turbopack: `path.join(/* turbopackIgnore: true */ process.cwd(), ...)` to
     avoid tracing entire repo during NFT.
+
+  7.9 UI design system (presentation — no API impact)
+  • **Primitives**: compose screens from `SurfaceCard`, `Button` / `ButtonLink`,
+    and shared input classes where applicable; dashboard **`ActionButton`** wraps
+    **`ButtonLink`** for consistent CTAs.
+  • **Meal plan / auth shells**: `components/meal-plan/form-card.tsx`,
+    `components/auth/auth-card.tsx`, and primary **`PrimaryButton`** /
+    **`AuthButton`** align with accent + **`text-[var(--foreground)]`** (same token
+    rule as **`Button`** primary).
+  • **Nav & chrome borders**: no **`border-white/10`** / Tailwind grey borders on
+    shell controls — only **`--border`** / **`--border-subtle`**; dark mode relies on
+    light-alpha whites in `globals.css` so outlines stay visible on dark surfaces.
+  • **Motion**: existing `motion/react` usage (e.g. Food Tracker **`FileUpload`**)
+    unchanged functionally; chrome uses the same CSS variables as static panels.
+  • **Accessibility**: focus-visible rings use **`--ring-focus`** on nav links,
+    **`Button`** / **`ButtonLink`**, theme toggle, and key interactive regions.
 
 
 --------------------------------------------------------------------------------
@@ -265,7 +374,8 @@
   npm run load / check-db / clear-db   TSX DB utilities (scripts/)
   npm run food-ai:dev       Spawn Python uvicorn for Food AI (needs venv)
   npm run food-ai:venv(:win)           Setup Python venv for food-ai
-  npm run food-ai:init-demo-model      Demo model helper (Node wrapper)
+  npm run food-ai:init-demo-model      Demo model helper (Node → Python)
+  npm run food-ai:init-demo-foodx      FoodX-style demo init (Node → Python)
 
 
 --------------------------------------------------------------------------------
@@ -286,14 +396,27 @@
 
   app/layout.tsx                    Root layout, fonts, theme script, Site Guide root
   app/globals.css                   Tailwind + CSS variables + utilities
-  components/app-navbar.tsx         Global nav, Talk to Chef, auth CTAs
+  components/app-navbar.tsx         Global nav (border tokens, active route)
+  components/theme-toggle.tsx       Theme switch; matches nav border/hover/focus
+  components/ui/card.tsx             SurfaceCard primitive
+  components/ui/button.tsx          Button / ButtonLink / buttonClass()
+  components/ui/input.tsx           Shared input + textarea classes
+  components/dashboard/action-button.tsx   Thin wrapper → ButtonLink
+  components/dashboard/dashboard-card.tsx  Uses SurfaceCard + ActionButton
+  components/dashboard/dashboard-header.tsx Header panel (SurfaceCard)
+  components/dashboard/dashboard-loading.tsx   Full-page skeleton while dashboard auth resolves
+  components/ui/skeleton.tsx            Pulse placeholder primitive
+  components/chat/chat-loading-shell.tsx Chef page bootstrap skeleton layout
   components/site-guide-assistant.tsx / site-guide-assistant-root.tsx
   components/chat/*                 Chat bubble, input, recipe card, parsing
+  components/chat/parse-recipe.ts  Heuristic “recipe block” extraction
+  components/nutrition/*            Nutrition tracker layout primitives
   components/food-tracker/*         History sidebar UI
   components/ui/file-upload.tsx     Drag-drop upload (Food Tracker)
   lib/gemini-food-vision.ts         Gemini meal-photo JSON extraction
   lib/food-tracker-history.ts       localStorage history CRUD + thumbnails
   lib/sanitize-chat-display.ts      Display-only dash cleanup (assistant text)
+  lib/prisma.ts                     Prisma singleton + reconnect helper
   app/api/food-ai/predict/route.ts  CNN + Gemini orchestration
 
 
@@ -304,6 +427,18 @@
   The wider monorepo (`miniproject/`) may contain notebooks and datasets under
   paths such as `Food-Recognition-and-Calorie-Estimation/` — training /
   experimentation artefacts complementing the Food Tracker story.
+
+
+--------------------------------------------------------------------------------
+13. HEALTH CHECK & COMMON NOISE
+--------------------------------------------------------------------------------
+
+  • Verify locally: `npm run lint`, then `npm run build` (or `npm run verify`).
+  • Chef chat + reviews need a reachable Postgres (`DATABASE_URL`) and
+    `npx prisma migrate deploy` on new environments.
+  • Messages like “Compaction failed” / “Persisting failed … write batch” in
+    the IDE usually come from Cursor/Chromium IndexedDB (workspace UI state),
+    not from Next.js or Prisma application logs.
 
 ================================================================================
   END OF DOCUMENTATION

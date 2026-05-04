@@ -136,7 +136,7 @@ function MealPlanChatContent() {
             type="button"
             onClick={saveLatestPlannerReply}
             disabled={loading || messages.filter((m) => m.role === "bot").length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur transition-all hover:bg-[var(--surface-muted)] disabled:pointer-events-none disabled:opacity-45 dark:border-white/[0.1]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--foreground)_6%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] disabled:pointer-events-none disabled:opacity-45"
           >
             <IconBookmark size={18} stroke={1.75} aria-hidden />
             Save latest reply
@@ -145,14 +145,14 @@ function MealPlanChatContent() {
 
         {saveBanner ? (
           <p
-            className="rounded-xl border border-[var(--accent)]/35 bg-[var(--accent-muted)] px-4 py-3 text-sm leading-relaxed text-[var(--foreground)] dark:text-white/70"
+            className="rounded-xl border border-[color-mix(in_srgb,var(--accent)_28%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface-muted))] px-4 py-3 text-sm leading-relaxed text-[var(--muted-text)]"
             role="status"
           >
             {saveBanner}
           </p>
         ) : null}
 
-        <p className="text-xs text-[color-mix(in_srgb,var(--foreground)_58%,transparent)] dark:text-white/60">
+        <p className="text-xs leading-relaxed text-[var(--muted-text)]">
           Separate from main Chef chat (same assistant styling).
         </p>
 

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { IconArrowLeft, IconCalendarPlus, IconMessages, IconTrash, IconExternalLink } from "@tabler/icons-react";
+import { IconArrowLeft, IconBookmark, IconCalendarPlus, IconMessages, IconNotebook, IconTrash, IconExternalLink } from "@tabler/icons-react";
 import { AppNavbar } from "@/components/app-navbar";
 import { MealPlanPageBackdrop } from "@/components/meal-plan/meal-plan-page-backdrop";
+import { SurfaceCard } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
 import { mealPlanRecordToChatQuery } from "@/lib/meal-plan-chat-query";
 import {
   deleteAiSavedPlan,
@@ -55,8 +57,8 @@ export default function SavedMealPlansPage() {
     <div className="relative flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
       <MealPlanPageBackdrop />
       <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-        <div className="space-y-10">
+      <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+        <div className="flex flex-col gap-8">
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-2 text-sm font-medium text-[var(--muted-text)] transition-colors duration-200 hover:text-[var(--foreground)]"
@@ -67,37 +69,38 @@ export default function SavedMealPlansPage() {
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">Saved meal plans</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">Saved meal plans</h1>
               <p className="mt-2 text-sm leading-relaxed text-[var(--muted-text)]">
                 <strong className="text-[var(--foreground)]">Intake drafts</strong> are what you typed on Create.
                 <strong className="text-[var(--foreground)]"> Planner replies</strong> come from the meal planner chat’s{" "}
                 <em>Save latest reply</em>.
               </p>
             </div>
-            <Link
-              href="/meal-plan/create"
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-medium text-white shadow-[0_0_22px_-4px_color-mix(in_srgb,var(--icon-green)_38%,transparent)] transition-all duration-200 hover:brightness-[1.06] motion-safe:active:scale-[0.98]"
-            >
+            <ButtonLink href="/meal-plan/create" variant="primary" className="inline-flex shrink-0 gap-2 px-5 py-3 text-sm font-medium shadow-sm">
               <IconCalendarPlus size={18} stroke={1.75} aria-hidden />
               New intake
-            </Link>
+            </ButtonLink>
           </div>
 
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">Intake drafts</h2>
             {drafts.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
-                <p className="text-sm text-[var(--muted-text)]">No drafts yet.</p>
-                <Link href="/meal-plan/create" className="mt-3 inline-block text-sm font-semibold text-[var(--accent)] hover:underline">
+              <SurfaceCard className="flex flex-col items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-8 text-center backdrop-blur-xl">
+                <IconNotebook className="h-11 w-11 text-[var(--muted-text)] opacity-45" stroke={1.25} aria-hidden />
+                <p className="text-sm font-semibold text-[var(--foreground)]">No data yet</p>
+                <p className="max-w-sm text-sm leading-relaxed text-[var(--muted-text)]">
+                  Save intake drafts from the planner flow—they show up here for edits and chat handoff.
+                </p>
+                <ButtonLink href="/meal-plan/create" variant="secondary" className="mt-1">
                   Create intake
-                </Link>
-              </div>
+                </ButtonLink>
+              </SurfaceCard>
             ) : (
               <ul className="space-y-4">
                 {drafts.map((p: MealPlanRecord) => (
                   <li
                     key={p.id}
-                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 shadow-[0_8px_28px_-12px_color-mix(in_srgb,var(--foreground)_18%,transparent)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)]"
+                    className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-5 shadow-sm backdrop-blur-xl transition-all duration-200 hover:shadow-md"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 space-y-2">
@@ -110,24 +113,25 @@ export default function SavedMealPlansPage() {
                         <p className="line-clamp-2 text-sm leading-relaxed text-[var(--muted-text)]">{p.ingredients}</p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2 lg:flex-col">
-                        <Link
+                        <ButtonLink
                           href={`/meal-plan/chat?${mealPlanRecordToChatQuery(p)}`}
                           onClick={() => setMealPlanChatSession({ draftId: p.id, planName: p.planName })}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-center text-sm font-semibold text-white shadow-[0_0_16px_-4px_color-mix(in_srgb,var(--icon-green)_35%,transparent)] transition-all hover:brightness-[1.06]"
+                          variant="primary"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-center text-sm font-semibold shadow-sm"
                         >
                           <IconMessages size={17} stroke={1.75} aria-hidden />
                           Open planner chat
-                        </Link>
+                        </ButtonLink>
                         <Link
                           href={`/meal-plan/create?edit=${p.id}`}
-                          className="rounded-xl border border-[var(--border)] px-4 py-2 text-center text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
+                          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2 text-center text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--foreground)_8%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                         >
                           Edit intake
                         </Link>
                         <button
                           type="button"
                           onClick={() => handleDeleteDraft(p.id, p.planName)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/35 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--muted-text)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                         >
                           <IconTrash size={16} stroke={1.75} aria-hidden />
                           Delete
@@ -143,18 +147,22 @@ export default function SavedMealPlansPage() {
           <section className="space-y-4">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">Planner replies</h2>
             {plannerReplies.length === 0 ? (
-              <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_70%,transparent)] p-8 text-center backdrop-blur-xl dark:border-white/[0.08]">
-                <p className="text-sm text-[var(--muted-text)]">Nothing saved from planner chat yet.</p>
-                <Link href="/meal-plan/create" className="mt-3 inline-block text-sm font-semibold text-[var(--accent)] hover:underline">
-                  Start from intake → planner chat
-                </Link>
-              </div>
+              <SurfaceCard className="flex flex-col items-center gap-3 bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-8 text-center backdrop-blur-xl">
+                <IconBookmark className="h-11 w-11 text-[var(--muted-text)] opacity-45" stroke={1.25} aria-hidden />
+                <p className="text-sm font-semibold text-[var(--foreground)]">No data yet</p>
+                <p className="max-w-sm text-sm leading-relaxed text-[var(--muted-text)]">
+                  Use <em className="not-italic font-medium text-[var(--foreground)]">Save latest reply</em> in planner chat to keep AI answers here.
+                </p>
+                <ButtonLink href="/meal-plan/create" variant="secondary" className="mt-1">
+                  Start from intake
+                </ButtonLink>
+              </SurfaceCard>
             ) : (
               <ul className="space-y-4">
                 {plannerReplies.map((s: AiSavedMealPlan) => (
                   <li
                     key={s.id}
-                    className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5 backdrop-blur-xl transition-colors hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border))] dark:border-white/[0.08]"
+                    className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-5 shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border-subtle))] hover:shadow-md"
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-2">
@@ -172,16 +180,17 @@ export default function SavedMealPlansPage() {
                         </Link>
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                        <Link
+                        <ButtonLink
                           href={`/meal-plan/ai/${s.id}`}
-                          className="inline-flex items-center justify-center rounded-xl bg-[var(--accent)] px-4 py-2.5 text-center text-sm font-semibold text-white shadow-[0_0_16px_-4px_color-mix(in_srgb,var(--icon-green)_35%,transparent)] transition-all hover:brightness-[1.06]"
+                          variant="primary"
+                          className="inline-flex items-center justify-center px-4 py-2.5 text-center text-sm font-semibold shadow-sm"
                         >
                           View full
-                        </Link>
+                        </ButtonLink>
                         <button
                           type="button"
                           onClick={() => handleDeleteAi(s.id, s.name)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-500/35 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-4 py-2.5 text-sm font-medium text-[var(--muted-text)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                         >
                           <IconTrash size={16} aria-hidden />
                           Delete

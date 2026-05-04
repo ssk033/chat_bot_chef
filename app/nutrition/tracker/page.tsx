@@ -125,9 +125,9 @@ export default function NutritionTrackerPage() {
       />
 
       <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch">
-          <TrackerCard className="flex min-h-[400px] flex-col p-5 lg:col-span-1">
+      <main className="relative z-10 mx-auto w-full max-w-7xl px-6 py-10">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-stretch lg:gap-8">
+          <TrackerCard className="flex min-h-[400px] flex-col lg:col-span-1">
             <h1 className="mb-2 text-xl font-semibold text-[var(--foreground)]">Add Meal</h1>
             <div className="flex flex-1 flex-col gap-3">
               <SelectField value={meal} onChange={(e) => setMeal(e.target.value)}>
@@ -170,7 +170,7 @@ export default function NutritionTrackerPage() {
             </div>
           </TrackerCard>
 
-          <TrackerCard className="flex min-h-[400px] flex-col gap-6 p-5 lg:col-span-2">
+          <TrackerCard className="flex min-h-[400px] flex-col gap-6 lg:col-span-2">
             <div>
               <h2 className="mb-2 text-xl font-semibold text-[var(--foreground)]">Today Summary</h2>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-6">
@@ -191,7 +191,7 @@ export default function NutritionTrackerPage() {
                   {entries.map((e) => (
                     <div
                       key={e.id}
-                      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-relaxed shadow-sm transition-all duration-200 hover:shadow-md"
+                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-4 text-sm leading-relaxed shadow-sm transition-all duration-200 hover:shadow-md"
                     >
                       <p className="font-semibold capitalize text-[var(--foreground)]">
                         {e.meal}: {e.food}

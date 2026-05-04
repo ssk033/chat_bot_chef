@@ -8,9 +8,9 @@ export const SelectField = forwardRef<HTMLSelectElement, React.SelectHTMLAttribu
         ref={ref}
         {...props}
         className={cn(
-          "w-full rounded-xl border border-[var(--border)] bg-transparent px-4 py-3 text-sm text-[var(--foreground)] outline-none transition-all duration-200",
-          "focus:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_22%,transparent)]",
-          "hover:bg-[color-mix(in_srgb,var(--surface)_92%,var(--background))]",
+          "w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition-all duration-200",
+          "focus:border-[var(--border-subtle)] focus:ring-2 focus:ring-[var(--ring-focus)]",
+          "hover:bg-[color-mix(in_srgb,var(--surface)_94%,var(--surface-muted)_6%)]",
           className
         )}
       >

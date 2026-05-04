@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -40,19 +40,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "predictedDish is required." }, { status: 400 });
     }
 
-    const row = await prisma.foodAiPredictionReview.create({
-      data: {
-        reviewerEmail,
-        predictedDish,
-        predictedConfidence,
-        backend,
-        rating,
-        comment,
-        correctedDish,
-        demoLowConfidence,
-      },
-      select: { id: true, createdAt: true },
-    });
+    const row = await withPrismaReconnect(() =>
+      prisma.foodAiPredictionReview.create({
+        data: {
+          reviewerEmail,
+          predictedDish,
+          predictedConfidence,
+          backend,
+          rating,
+          comment,
+          correctedDish,
+          demoLowConfidence,
+        },
+        select: { id: true, createdAt: true },
+      })
+    );
 
     return NextResponse.json({ ok: true, id: row.id });
   } catch (e) {

@@ -115,8 +115,8 @@ export function FileUpload({ onChange, accept = defaultAccept, multiple = false,
                       damping: 20,
                     }}
                     className={cn(
-                      "relative z-40 flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_90%,transparent)] group-hover/file:shadow-xl dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)]",
-                      "shadow-[0px_10px_40px_rgba(15,23,42,0.12)] dark:shadow-[0px_12px_36px_rgba(0,0,0,0.35)]",
+                      "relative z-40 flex h-32 w-full max-w-[8rem] items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] group-hover/file:shadow-xl dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)]",
+                      "shadow-[0px_10px_40px_color-mix(in_srgb,var(--foreground)_12%,transparent)]",
                     )}
                   >
                     {isDragActive ? (
@@ -142,8 +142,8 @@ export function FileUpload({ onChange, accept = defaultAccept, multiple = false,
             </>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] px-3 py-3 ring-1 ring-black/[0.04] dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] dark:ring-white/[0.06]">
-                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent-muted)_70%,transparent)] text-[var(--accent)]">
+              <div className="flex items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] px-3 py-3 shadow-sm dark:bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)]">
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface-muted))] text-[var(--accent)] ring-1 ring-[var(--border-subtle)]">
                   <IconUpload className="h-5 w-5" stroke={1.75} aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -197,7 +197,7 @@ export function GridPattern() {
                 "flex h-10 w-10 shrink-0 rounded-[2px]",
                 even
                   ? "bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] dark:bg-[color-mix(in_srgb,var(--surface)_35%,var(--surface-muted)_65%)]"
-                  : "bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] shadow-[0px_0px_1px_2px_rgba(255,255,255,0.85)_inset] dark:bg-[color-mix(in_srgb,var(--surface)_35%,var(--surface-muted)_65%)] dark:shadow-[0px_0px_1px_2px_rgba(0,0,0,0.35)_inset]",
+                  : "bg-[color-mix(in_srgb,var(--surface-muted)_55%,var(--surface)_45%)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--foreground)_06%,transparent)] dark:bg-[color-mix(in_srgb,var(--surface)_35%,var(--surface-muted)_65%)]",
               )}
             />
           );

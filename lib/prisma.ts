@@ -8,14 +8,36 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
+/** Walk Error.cause and common shapes so driver/Rust messages still match. */
+function collectErrorText(error: unknown, depth = 0): string {
+  if (error == null || depth > 12) return "";
+  if (error instanceof Error) {
+    return `${error.message} ${collectErrorText(error.cause, depth + 1)}`;
+  }
+  if (typeof error === "object") {
+    const o = error as { message?: unknown; cause?: unknown };
+    if (typeof o.message === "string") {
+      return `${o.message} ${collectErrorText(o.cause, depth + 1)}`;
+    }
+  }
+  try {
+    return String(error);
+  } catch {
+    return "";
+  }
+}
+
 const isConnectionClosedError = (error: unknown) => {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
+  const text = collectErrorText(error).toLowerCase();
   return (
-    message.includes("postgresql connection") ||
-    message.includes("error { kind: closed") ||
-    message.includes("connection closed") ||
-    message.includes("can't reach database server")
+    text.includes("postgresql connection") ||
+    text.includes("kind: closed") ||
+    text.includes("connection closed") ||
+    text.includes("server closed the connection") ||
+    text.includes("connection terminated") ||
+    text.includes("econnreset") ||
+    text.includes("broken pipe") ||
+    text.includes("can't reach database server")
   );
 };
 

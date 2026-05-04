@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -8,7 +7,9 @@ import { IconMessageCircle } from "@tabler/icons-react";
 import { AppNavbar } from "@/components/app-navbar";
 import { DashboardCard, type DashboardCardIconId } from "@/components/dashboard/dashboard-card";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { ButtonLink } from "@/components/ui/button";
 import { getStoredUser } from "@/lib/client-auth";
+import { DashboardLoadingSkeleton } from "@/components/dashboard/dashboard-loading";
 import { cn } from "@/lib/utils";
 
 function subscribeHtmlDark(cb: () => void) {
@@ -80,11 +81,7 @@ export default function DashboardPage() {
   }, [isAuthorized, router]);
 
   if (!isAuthorized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--muted-text)]">
-        Checking account...
-      </div>
-    );
+    return <DashboardLoadingSkeleton />;
   }
 
   return (
@@ -133,30 +130,27 @@ export default function DashboardPage() {
       />
 
       <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-6 py-10">
         <DashboardHeader
           title="Meal-IT!! Dashboard"
           subtitle="Built by Sanidhya, Rajnish, Sachet, Aayush. Jump into planning, tracking, or chat from one place."
           action={
-            <Link
-              href="/chat-bot-chef"
-              className="glow-pill inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:brightness-[1.03] motion-safe:active:scale-[0.98]"
-            >
+            <ButtonLink href="/chat-bot-chef" variant="secondary" className="inline-flex gap-2 px-5 py-3 text-sm font-medium">
               <IconMessageCircle size={18} stroke={1.75} aria-hidden />
               Talk to Chef
-            </Link>
+            </ButtonLink>
           }
         />
 
-        <section aria-labelledby="quick-actions-heading" className="space-y-4">
+        <section aria-labelledby="quick-actions-heading" className="flex flex-col gap-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h2 id="quick-actions-heading" className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">
-              Quick Actions
+            <h2 id="quick-actions-heading" className="text-lg font-medium text-[var(--foreground)]">
+              Quick actions
             </h2>
-            <p className="text-xs text-[var(--muted-text)] sm:text-right">Primary action highlighted below.</p>
+            <p className="text-sm leading-relaxed text-[var(--muted-text)] sm:text-right">Primary action highlighted below.</p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             {cards.map((card, index) => (
               <DashboardCard
                 key={card.title}

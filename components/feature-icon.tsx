@@ -25,8 +25,8 @@ export function FeatureIcon({ icon: Icon, className }: FeatureIconProps) {
   return (
     <div
       className={twMerge(
-        "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[var(--accent-muted)] text-[var(--accent)] shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 dark:ring-white/[0.06]",
-        "group-hover/card:bg-[color-mix(in_srgb,var(--accent-muted)_55%,var(--icon-green)_45%)] group-hover/card:shadow-md group-hover/card:ring-[var(--accent)]/25",
+        "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--accent)_14%,var(--surface-muted))] text-[var(--accent)] shadow-sm transition-all duration-200",
+        "group-hover/card:bg-[color-mix(in_srgb,var(--accent)_18%,var(--surface-muted))] group-hover/card:shadow-md group-hover/card:ring-1 group-hover/card:ring-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))]",
         className
       )}
     >

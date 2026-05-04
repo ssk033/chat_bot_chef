@@ -73,7 +73,7 @@ export function InputField({
         ) : null}
       </div>
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-red-600 dark:text-red-400" role="alert">
+        <p id={`${id}-error`} className="text-sm leading-relaxed text-[var(--foreground)]" role="alert">
           {error}
         </p>
       ) : null}

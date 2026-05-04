@@ -34,11 +34,10 @@ export function TextAreaField({
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : helperText ? `${id}-hint` : undefined}
         className={twMerge(
-          "min-h-[120px] w-full resize-y rounded-xl border border-[color-mix(in_srgb,var(--foreground)_12%,var(--border))] bg-transparent px-4 py-3 text-[var(--foreground)] shadow-sm outline-none transition-all duration-200",
-          "placeholder:text-[var(--muted-text)] placeholder:opacity-75",
-          "focus:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] focus:ring-2 focus:ring-[var(--ring-focus)] focus:ring-offset-2 focus:ring-offset-[var(--background)]",
-          "dark:border-white/[0.11]",
-          error && "border-red-500/60 focus:border-red-500/60 focus:ring-red-500/25"
+          "min-h-[120px] w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] shadow-sm outline-none transition-all duration-200",
+          "placeholder:text-[color-mix(in_srgb,var(--muted-text)_72%,transparent)]",
+          "focus:border-[var(--border-subtle)] focus:ring-2 focus:ring-[var(--ring-focus)] focus:ring-offset-2 focus:ring-offset-[var(--background)]",
+          error && "border-[color-mix(in_srgb,var(--foreground)_22%,var(--border-subtle))] bg-[var(--surface-muted)]"
         )}
         {...textareaProps}
       />
@@ -48,7 +47,7 @@ export function TextAreaField({
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-error`} className="text-xs text-red-600 dark:text-red-400" role="alert">
+        <p id={`${id}-error`} className="text-xs leading-relaxed text-[var(--foreground)]" role="alert">
           {error}
         </p>
       ) : null}

@@ -8,7 +8,7 @@
   --surface: #ffffff;
   --surface-muted: #eefbf3;
   --border-subtle: rgba(15, 23, 42, 0.12);
-  --border: rgba(15, 23, 42, 0.12);
+  --border: rgba(15, 23, 42, 0.2);
   --accent: #16a34a;
   --accent-muted: rgba(34, 197, 94, 0.14);
   --ring-focus: rgba(34, 197, 94, 0.28);
@@ -26,8 +26,9 @@ html.dark {
   --foreground: #f4f7fb;
   --surface: #0d1119;
   --surface-muted: #111827;
-  --border-subtle: rgba(148, 163, 184, 0.22);
-  --border: rgba(148, 163, 184, 0.22);
+  /* Higher contrast on dark surfaces so outlines stay visible */
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.18);
   --accent: #34d399;
   --accent-muted: rgba(52, 211, 153, 0.2);
   --ring-focus: rgba(74, 222, 128, 0.3);

@@ -1,11 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { IconPhotoScan } from "@tabler/icons-react";
 import { FoodTrackerHistorySidebar } from "@/components/food-tracker/food-tracker-history-sidebar";
 import { AppNavbar } from "@/components/app-navbar";
+import { DashboardLoadingSkeleton } from "@/components/dashboard/dashboard-loading";
 import { FileUpload } from "@/components/ui/file-upload";
+import { SurfaceCard } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { inputClass } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getStoredUser } from "@/lib/client-auth";
+import { cn } from "@/lib/utils";
 import {
   clearFoodTrackerHistory,
   fileToThumbnailDataUrl,
@@ -14,6 +22,18 @@ import {
   removeFoodTrackerHistoryEntry,
   type FoodTrackerHistoryEntry,
 } from "@/lib/food-tracker-history";
+
+function subscribeHtmlDark(cb: () => void) {
+  if (typeof document === "undefined") return () => {};
+  const el = document.documentElement;
+  const obs = new MutationObserver(cb);
+  obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+  return () => obs.disconnect();
+}
+
+function readHtmlIsDark(): boolean {
+  return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+}
 
 type PredictResult = {
   dish: string;
@@ -54,6 +74,9 @@ export default function FoodTrackerPage() {
   const [history, setHistory] = useState<FoodTrackerHistoryEntry[]>([]);
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
   const [historyThumbUrl, setHistoryThumbUrl] = useState<string | null>(null);
+  const isDark = useSyncExternalStore(subscribeHtmlDark, readHtmlIsDark, () => false);
+  const [lightBgSrc, setLightBgSrc] = useState("/dashboard-bg-light.png");
+  const [darkBgSrc, setDarkBgSrc] = useState("/dashboard-bg-dark.png");
 
   useEffect(() => {
     if (!authorized) router.replace("/auth/login?next=/food-tracker");
@@ -180,54 +203,81 @@ export default function FoodTrackerPage() {
   };
 
   if (!authorized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--muted-text)]">
-        Checking account…
-      </div>
-    );
+    return <DashboardLoadingSkeleton />;
   }
 
   return (
     <div className="relative min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      {/* Match dashboard: next/image layers + scrim from `--background` (not `--foreground`, which washed dark mode white). */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden suppressHydrationWarning>
+        <Image
+          alt=""
+          src={lightBgSrc}
+          fill
+          sizes="100vw"
+          quality={90}
+          className={cn(
+            "object-cover object-center transition-opacity duration-300",
+            isDark ? "opacity-0" : "opacity-[0.52]"
+          )}
+          onError={() => setLightBgSrc("/food%20background%20light%20theme.png")}
+          priority={false}
+        />
+        <Image
+          alt=""
+          src={darkBgSrc}
+          fill
+          sizes="100vw"
+          quality={90}
+          className={cn(
+            "object-cover object-center transition-opacity duration-300",
+            isDark ? "opacity-[0.52]" : "opacity-0"
+          )}
+          onError={() => setDarkBgSrc("/food%20backgorund%20dark%20theme.png")}
+          priority={false}
+        />
+      </div>
       <div
-        className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat dark:hidden"
-        style={{ backgroundImage: "url('/food%20background%20light%20theme.png')" }}
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[1]",
+          isDark
+            ? "bg-[color-mix(in_srgb,var(--background)_54%,transparent)]"
+            : "bg-[color-mix(in_srgb,var(--background)_48%,transparent)]"
+        )}
+        aria-hidden
       />
-      <div
-        className="pointer-events-none absolute inset-0 z-0 hidden bg-cover bg-center bg-no-repeat dark:block"
-        style={{ backgroundImage: "url('/food%20backgorund%20dark%20theme.png')" }}
-      />
-      <div className="pointer-events-none absolute inset-0 z-[1] bg-black/45 backdrop-blur-[1px] dark:bg-black/60" />
       <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
+      <main className="relative z-10 mx-auto w-full max-w-7xl px-6 py-10">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
           <div className="min-w-0 flex-1 space-y-8">
-        <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:p-8">
+        <SurfaceCard className="border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-6 backdrop-blur-md md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Food Tracker</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Food Tracker</h1>
             <ModelStatusPill loading={loading} showError={Boolean(error)} />
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted-text)]">
             Upload a clear photo of your plate. We show a dish name and rough calories, protein, carbs, and fat,
             useful for tracking and not as exact as weighing food.
           </p>
-          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted-text)]">
             The food AI runs when you tap analyze. It compares your picture to a list of dishes, picks the closest
             match, and fills nutrition from typical servings for that dish.
           </p>
-          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
-            The vision side uses <strong>CNNs</strong> (<strong>convolutional neural networks</strong>), models that
-            learn patterns in pixels for images. They are trained or fine-tuned on <strong>food photo datasets</strong>,
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted-text)]">
+            The vision side uses <strong className="font-medium text-[var(--foreground)]">CNNs</strong> (
+            <strong className="font-medium text-[var(--foreground)]">convolutional neural networks</strong>), models that
+            learn patterns in pixels for images. They are trained or fine-tuned on{" "}
+            <strong className="font-medium text-[var(--foreground)]">food photo datasets</strong>,
             with many labelled meal pictures paired with dish names. These often blend large public benchmarks with
             smaller cuisine-focused lists, including Indian plates or broader multi-class menus.
           </p>
-        </div>
+        </SurfaceCard>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
-            <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Upload image</h2>
-            <div className="flex flex-1 flex-col space-y-4">
-              <div className="overflow-hidden rounded-xl border border-dashed border-[color-mix(in_srgb,var(--border)_88%,var(--accent)_12%)] bg-[color-mix(in_srgb,var(--surface-muted)_28%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_18%,var(--surface)_82%)] dark:ring-white/[0.05]">
+        <div id="food-tracker-upload-section" className="grid grid-cols-1 gap-6 md:grid-cols-2 scroll-mt-24">
+          <SurfaceCard className="flex min-h-[400px] flex-col border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-6 backdrop-blur-md md:min-h-[440px]">
+            <h2 className="mb-4 text-lg font-medium text-[var(--foreground)]">Upload image</h2>
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="overflow-hidden rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)] ring-1 ring-[var(--border-subtle)]">
                 <FileUpload
                   accept={{ "image/*": [] }}
                   multiple={false}
@@ -242,89 +292,106 @@ export default function FoodTrackerPage() {
                 />
               </div>
               {displayPreviewSrc ? (
-                <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_55%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_35%,var(--surface)_65%)] dark:ring-white/[0.05]">
+                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] ring-1 ring-[var(--border-subtle)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={displayPreviewSrc} alt="Preview" className="max-h-64 w-full object-contain" />
                 </div>
               ) : null}
-              <button
+              <Button
                 type="button"
                 disabled={!canSubmit}
                 onClick={analyze}
-                className="mt-auto w-full rounded-xl bg-green-500 py-3 text-sm font-medium text-black shadow-[0_0_20px_rgba(34,197,94,0.2)] transition-all duration-200 hover:bg-green-400 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-green-500 disabled:motion-safe:active:scale-100"
+                variant="primary"
+                className="mt-auto w-full py-3 text-sm shadow-sm"
               >
                 {loading ? "Analyzing…" : "Recognize dish & estimate nutrition"}
-              </button>
+              </Button>
               {error ? (
-                <p className="mt-1 whitespace-pre-line text-justify rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                <p className="mt-1 whitespace-pre-line rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-sm leading-relaxed text-[var(--foreground)]">
                   {error}
                 </p>
               ) : null}
             </div>
-          </section>
+          </SurfaceCard>
 
-          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
-            <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Result</h2>
-            {!result ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 py-8 text-center">
-                <p className="text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/60">
-                  Results appear here after analysis.
+          <SurfaceCard className="flex min-h-[400px] flex-col border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] p-6 backdrop-blur-md md:min-h-[440px]">
+            <h2 className="mb-4 text-lg font-medium text-[var(--foreground)]">Result</h2>
+            {loading ? (
+              <FoodTrackerResultSkeleton />
+            ) : !result ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-2 py-8 text-center">
+                <IconPhotoScan className="h-11 w-11 text-[var(--muted-text)] opacity-45" stroke={1.25} aria-hidden />
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">No data yet</h3>
+                <p className="max-w-xs text-sm leading-relaxed text-[var(--muted-text)]">
+                  Upload a clear plate photo and tap analyse to see dish name, confidence, and estimated macros.
                 </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="mt-1"
+                  onClick={() => document.getElementById("food-tracker-upload-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  Upload a photo
+                </Button>
               </div>
             ) : (
-              <div className="flex flex-1 flex-col space-y-4">
+              <div className="flex flex-1 flex-col gap-4">
                 {result.demoLowConfidence ? (
-                  <p className="rounded-lg border border-red-400/45 bg-red-500/10 p-3 text-sm text-justify text-red-800 dark:text-red-200">
-                    <strong>Not sure.</strong> This photo did not match strongly enough. Try a clearer, well lit shot with
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--foreground)]">
+                    <strong className="font-medium">Not sure.</strong> This photo did not match strongly enough. Try a clearer, well lit shot with
                     the food in the centre.
                   </p>
                 ) : null}
                 {result.demoMode && !result.demoLowConfidence ? (
-                  <p className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-justify text-amber-950 dark:text-amber-200">
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--accent)_08%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--muted-text)]">
                     Heads up: you are using a demo setup, so treat the dish name and nutrition as rough guides only.
                   </p>
                 ) : null}
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--muted-text)]">Dish</p>
-                  <p className="text-2xl font-bold">{result.dish}</p>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-text)]">Dish</p>
+                  <p className="text-lg font-semibold text-[var(--foreground)]">{result.dish}</p>
                   <ConfidenceMarker confidence={result.confidence} lowTrust={Boolean(result.demoLowConfidence)} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Metric label="Calories" value={`${result.calories} kcal`} />
-                  <Metric label="Protein" value={`${result.protein_g} g`} />
-                  <Metric label="Carbs" value={`${result.carbs_g} g`} />
-                  <Metric label="Fats" value={`${result.fats_g} g`} />
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-4 shadow-sm transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] hover:shadow-md motion-safe:hover:scale-[1.01]">
+                  <p className="text-xs font-medium text-[var(--muted-text)]">Calories</p>
+                  <p className="text-lg font-semibold tracking-tight text-[var(--foreground)]">{result.calories} kcal</p>
                 </div>
-                <p className="text-xs text-justify text-[var(--muted-text)]">
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <MacroStat label="Protein" value={`${result.protein_g} g`} />
+                  <MacroStat label="Carbs" value={`${result.carbs_g} g`} />
+                  <MacroStat label="Fats" value={`${result.fats_g} g`} />
+                </div>
+                <p className="text-xs leading-relaxed text-[var(--muted-text)]">
                   Nutrition is for a typical serving of that dish and is not measured from your exact portion.
                 </p>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => {
                     setReviewModalOpen(true);
                     setReviewThanks(false);
                     setReviewError(null);
                   }}
-                  className="btn-solid mt-auto w-full rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:bg-[var(--background)] motion-safe:active:scale-[0.98] dark:border-white/10"
+                  className="mt-auto w-full py-3 text-sm"
                 >
                   Review this result
-                </button>
+                </Button>
               </div>
             )}
-          </section>
+          </SurfaceCard>
         </div>
 
         {reviewModalOpen && result ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
             <button
               type="button"
-              className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
+              className="absolute inset-0 bg-[color-mix(in_srgb,var(--foreground)_42%,transparent)] backdrop-blur-[1px] transition-opacity duration-200"
               aria-label="Close review"
               onClick={() => !reviewSubmitting && setReviewModalOpen(false)}
             />
-            <div className="theme-panel relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-xl">
+            <div className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-6 shadow-xl transition-all duration-200">
               <div className="mb-4 flex items-start justify-between gap-3">
-                <h2 id="review-modal-title" className="text-lg font-semibold">
+                <h2 id="review-modal-title" className="text-lg font-medium text-[var(--foreground)]">
                   Review this result
                 </h2>
                 <button
@@ -366,10 +433,10 @@ export default function FoodTrackerPage() {
                           setReviewError(null);
                         }}
                         disabled={reviewSubmitting}
-                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 ${
+                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all duration-200 hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] ${
                           reviewRating === value
-                            ? "border-[var(--user-bubble-bg)] bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)]"
-                            : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]"
+                            ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-subtle))] bg-[var(--accent)] text-[var(--foreground)]"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--foreground)]"
                         }`}
                       >
                         {label}
@@ -388,7 +455,7 @@ export default function FoodTrackerPage() {
                     onChange={(e) => setReviewCorrectedDish(e.target.value)}
                     disabled={reviewSubmitting}
                     placeholder="e.g. masala dosa"
-                    className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
+                    className={cn(inputClass, "mt-1")}
                     maxLength={512}
                   />
                 </label>
@@ -400,12 +467,13 @@ export default function FoodTrackerPage() {
                     disabled={reviewSubmitting}
                     rows={4}
                     placeholder="Lighting, multiple dishes on plate, wrong cuisine…"
-                    className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2 text-sm text-[var(--foreground)] outline-none focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-50"
+                    className={cn(inputClass, "mt-1 resize-y min-h-[88px]")}
                     maxLength={4000}
                   />
                 </label>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
                   disabled={reviewRating === null || reviewSubmitting}
                   onClick={async () => {
                     const account = getStoredUser();
@@ -439,17 +507,17 @@ export default function FoodTrackerPage() {
                       setReviewSubmitting(false);
                     }
                   }}
-                  className="btn-solid w-full rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full py-2.5 text-sm shadow-sm"
                 >
                   {reviewSubmitting ? "Sending…" : "Submit feedback"}
-                </button>
+                </Button>
                 {reviewError ? (
-                  <p className="rounded-lg border border-red-400/45 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-sm leading-relaxed text-[var(--foreground)]">
                     {reviewError}
                   </p>
                 ) : null}
                 {reviewThanks ? (
-                  <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-900 dark:text-emerald-100">
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--muted-text)]">
                     Thanks, your feedback was saved. Close this window or analyse another photo.
                   </p>
                 ) : null}
@@ -473,13 +541,43 @@ export default function FoodTrackerPage() {
   );
 }
 
+function FoodTrackerResultSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col gap-4" aria-busy="true" aria-label="Loading food tracker result">
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-16 rounded-md" />
+        <Skeleton className="h-7 w-[85%] max-w-sm rounded-lg" />
+        <Skeleton className="h-6 w-32 rounded-md" />
+      </div>
+      <Skeleton className="h-[4.5rem] w-full rounded-xl" />
+      <div className="grid grid-cols-3 gap-4">
+        <Skeleton className="h-[4.25rem] rounded-xl" />
+        <Skeleton className="h-[4.25rem] rounded-xl" />
+        <Skeleton className="h-[4.25rem] rounded-xl" />
+      </div>
+      <Skeleton className="mt-auto h-11 w-full rounded-xl" />
+    </div>
+  );
+}
+
+function MacroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 shadow-sm transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] hover:shadow-md motion-safe:hover:scale-[1.01]">
+      <p className="text-xs font-medium text-[var(--muted-text)]">{label}</p>
+      <p className="text-sm font-semibold tracking-tight text-[var(--foreground)]">{value}</p>
+    </div>
+  );
+}
+
 function ModelStatusPill({ loading, showError }: { loading: boolean; showError: boolean }) {
+  const shell =
+    "inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] px-3 py-1 text-xs font-medium transition-all duration-200";
   if (loading) {
     return (
-      <span className="inline-flex animate-pulse items-center gap-2 rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-medium text-yellow-900 dark:text-yellow-300">
+      <span className={`${shell} animate-pulse bg-[var(--surface-muted)] text-[var(--muted-text)]`}>
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-70 dark:bg-yellow-300" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-500 dark:bg-yellow-400" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[color-mix(in_srgb,var(--accent)_55%,var(--muted-text)_45%)] opacity-60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--accent)]" />
         </span>
         Working on your photo…
       </span>
@@ -487,15 +585,15 @@ function ModelStatusPill({ loading, showError }: { loading: boolean; showError: 
   }
   if (showError) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-900 dark:text-red-100">
-        <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />
+      <span className={`${shell} bg-[color-mix(in_srgb,var(--foreground)_08%,var(--surface-muted))] text-[var(--foreground)]`}>
+        <span className="h-2 w-2 rounded-full bg-[var(--muted-text)]" aria-hidden />
         Something went wrong
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-900 dark:text-emerald-100">
-      <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+    <span className={`${shell} bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface-muted))] text-[var(--muted-text)]`}>
+      <span className="h-2 w-2 rounded-full bg-[var(--accent)]" aria-hidden />
       Food AI ready
     </span>
   );
@@ -516,28 +614,24 @@ function ConfidenceMarker({ confidence, lowTrust }: { confidence: number; lowTru
   const label =
     tone === "high" ? "High confidence" : tone === "mid" ? "Medium confidence" : "Low confidence";
 
-  const styles =
-    tone === "high"
-      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-950 dark:border-emerald-500/35 dark:bg-emerald-950/30 dark:text-emerald-50"
-      : tone === "mid"
-        ? "border-amber-500/45 bg-amber-500/12 text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/25 dark:text-amber-50"
-        : "border-red-500/45 bg-red-500/12 text-red-900 dark:border-red-500/35 dark:bg-red-950/30 dark:text-red-50";
+  const toneText = tone === "low" ? "text-[var(--muted-text)]" : "text-[var(--foreground)]";
 
   const dot =
     tone === "high"
-      ? "bg-emerald-500"
+      ? "bg-[var(--accent)]"
       : tone === "mid"
-        ? "bg-amber-500"
-        : "bg-red-500";
+        ? "bg-[color-mix(in_srgb,var(--accent)_72%,var(--muted-text)_28%)]"
+        : "bg-[var(--muted-text)]";
 
   return (
-    <p
-      className={`mt-2 inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm ${styles}`}
+    <span
+      role="status"
+      className={`mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-1 text-xs ${toneText}`}
     >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
       <span className="font-medium">{label}</span>
       <span className="opacity-90">({pct.toFixed(0)}% sure)</span>
-    </p>
+    </span>
   );
 }
 
@@ -546,13 +640,4 @@ function parseApiError(data: { error?: string; detail?: unknown }, status: numbe
   if (typeof data.error === "string") return data.error;
   if (Array.isArray(data.detail) && data.detail[0]?.msg) return String(data.detail[0].msg);
   return `Request failed (${status})`;
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface-muted)_85%,transparent)] p-3 shadow-sm ring-1 ring-black/[0.03] transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] hover:ring-[var(--accent)]/12 dark:bg-[color-mix(in_srgb,var(--surface-muted)_72%,var(--surface)_28%)] dark:ring-white/[0.05]">
-      <p className="text-xs text-[var(--muted-text)]">{label}</p>
-      <p className="text-lg font-semibold tracking-tight">{value}</p>
-    </div>
-  );
 }

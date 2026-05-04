@@ -12,7 +12,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md",
+        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-4 text-center shadow-sm transition-all duration-200 hover:shadow-md",
         className
       )}
     >

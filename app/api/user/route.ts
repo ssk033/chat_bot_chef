@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
 export async function PATCH(req: Request) {
@@ -17,11 +17,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "displayName required" }, { status: 400 });
     }
 
-    const user = await prisma.user.update({
-      where: { anonymousKey },
-      data: { displayName },
-      select: { id: true, displayName: true, anonymousKey: true },
-    });
+    const user = await withPrismaReconnect(() =>
+      prisma.user.update({
+        where: { anonymousKey },
+        data: { displayName },
+        select: { id: true, displayName: true, anonymousKey: true },
+      })
+    );
 
     return NextResponse.json({ user });
   } catch (e: unknown) {

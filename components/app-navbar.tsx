@@ -1,18 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { clearStoredUser, getStoredUser } from "@/lib/client-auth";
 import { ChefLogo } from "@/components/chef-logo";
+import { ButtonLink } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type AppNavbarProps = {
   showAuth?: boolean;
 };
 
+/** Shared chrome for text links and logout — matches design-system nav buttons. */
+function navLinkClass(active: boolean) {
+  return cn(
+    "inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-medium transition-all duration-200",
+    "bg-transparent hover:bg-[var(--surface-muted)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
+    active
+      ? "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]"
+      : "border-[var(--border-subtle)] text-[var(--foreground)]"
+  );
+}
+
 export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const loggedIn = useSyncExternalStore(
     () => () => {},
     () => Boolean(getStoredUser()),
@@ -20,6 +35,8 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   );
 
   const talkToChefHref = loggedIn ? "/chat-bot-chef" : "/auth/login?next=/chat-bot-chef";
+  const chefActive = pathname === "/chat-bot-chef";
+  const dashActive = pathname === "/dashboard";
 
   const handleLogout = () => {
     clearStoredUser();
@@ -27,48 +44,32 @@ export function AppNavbar({ showAuth = true }: AppNavbarProps) {
   };
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/80 shadow-[0_1px_0_color-mix(in_srgb,var(--border)_70%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-[var(--surface)]/68">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-5">
+    <nav className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] shadow-[0_1px_0_color-mix(in_srgb,var(--border-subtle)_80%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] transition-colors duration-200">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-6 py-3">
         <ChefLogo compact />
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-2.5">
           <ThemeToggle />
-          <Link
-            href={talkToChefHref}
-            className="glow-pill rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:opacity-95 motion-safe:active:scale-[0.98]"
-          >
+          <Link href={talkToChefHref} className={navLinkClass(chefActive)}>
             Talk to Chef
           </Link>
           {showAuth && !loggedIn ? (
             <>
-              <Link
-                href="/auth/login"
-                className="glow-pill rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:opacity-95 motion-safe:active:scale-[0.98]"
-              >
-                Sign In
+              <Link href="/auth/login" className={navLinkClass(pathname.startsWith("/auth/login"))}>
+                Sign in
               </Link>
-              <Link
-                href="/auth/register"
-                className="btn-solid rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-black shadow-sm transition-all duration-200 hover:shadow-md hover:brightness-105 motion-safe:active:scale-[0.98]"
-              >
-                Get Started
-              </Link>
+              <ButtonLink href="/auth/register" variant="primary">
+                Get started
+              </ButtonLink>
             </>
           ) : null}
           {showAuth && loggedIn ? (
             <>
-              <Link
-                href="/dashboard"
-                className="glow-pill rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:opacity-95 motion-safe:active:scale-[0.98]"
-              >
+              <Link href="/dashboard" className={navLinkClass(dashActive)}>
                 Dashboard
               </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="btn-solid rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:shadow-md motion-safe:active:scale-[0.98]"
-              >
-                Logout
+              <button type="button" onClick={handleLogout} className={navLinkClass(false)}>
+                Log out
               </button>
             </>
           ) : null}

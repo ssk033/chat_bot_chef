@@ -54,13 +54,13 @@ export function ChatInput({
   }, [value, autosize]);
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--background)]/90 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--background)]/75 sm:px-6 sm:pb-5 sm:pt-4">
+    <div className="border-t border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--background)_85%,transparent)] sm:px-6 sm:pb-5 sm:pt-4">
       <div className="mx-auto max-w-[760px]">
-        <div className="flex items-end gap-2 rounded-[999px] border border-[var(--border)] bg-[var(--surface)] px-2 py-2 shadow-sm transition-all duration-200 focus-within:border-[color-mix(in_srgb,var(--accent)_45%,var(--border))] focus-within:shadow-md focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,var(--accent)_22%,transparent)] sm:gap-3 sm:px-3 sm:py-2.5">
+        <div className="flex items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-2 py-2 shadow-sm transition-all duration-200 focus-within:border-[color-mix(in_srgb,var(--accent)_35%,var(--border-subtle))] focus-within:shadow-md focus-within:ring-2 focus-within:ring-[var(--ring-focus)] sm:gap-3 sm:px-3 sm:py-2.5">
           <button
             type="button"
             disabled
-            className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted-text)] opacity-40 sm:mb-1.5 sm:h-10 sm:w-10"
+            className="mb-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--muted-text)] opacity-40 transition-all duration-200 sm:mb-1.5 sm:h-10 sm:w-10"
             aria-label="Attachments (coming soon)"
             title="Coming soon"
           >
@@ -89,7 +89,7 @@ export function ChatInput({
             disabled={isLoading}
             autoComplete="off"
             enterKeyHint="send"
-            className="mb-1 min-h-[48px] w-full min-w-0 flex-1 resize-none rounded-3xl border-0 bg-transparent px-3 py-3 text-base leading-relaxed text-[var(--foreground)] placeholder:text-[var(--muted-text)] outline-none disabled:opacity-50 sm:px-4 sm:text-sm sm:leading-relaxed"
+            className="mb-1 min-h-[48px] w-full min-w-0 flex-1 resize-none rounded-xl border-0 bg-transparent px-3 py-3 text-base leading-relaxed text-[var(--foreground)] placeholder:text-[color-mix(in_srgb,var(--muted-text)_75%,transparent)] outline-none transition-all duration-200 disabled:opacity-50 sm:px-4 sm:text-sm sm:leading-relaxed"
           />
 
           <div className="mb-1 flex shrink-0 items-center gap-1 sm:gap-1.5">
@@ -97,7 +97,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={onStopSpeak}
-                className="glow-pill flex h-10 w-10 items-center justify-center rounded-full text-[var(--accent)] transition-all duration-200 hover:brightness-105 motion-safe:active:scale-95"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--foreground)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--accent)_12%)] motion-safe:active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                 aria-label="Stop speaking"
               >
                 <IconPlayerStop size={20} stroke={1.75} aria-hidden />
@@ -107,7 +107,7 @@ export function ChatInput({
                 type="button"
                 onClick={onSpeak}
                 disabled={!hasBotReply}
-                className="glow-pill flex h-10 w-10 items-center justify-center rounded-full text-[var(--accent)] transition-all duration-200 hover:brightness-105 motion-safe:active:scale-95 disabled:pointer-events-none disabled:opacity-35"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--foreground)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--accent)_12%)] motion-safe:active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)] disabled:pointer-events-none disabled:opacity-35"
                 aria-label="Speak last reply"
               >
                 <IconPlayerPlay size={20} stroke={1.75} aria-hidden />
@@ -132,7 +132,7 @@ export function ChatInput({
               type="button"
               onClick={onSend}
               disabled={isLoading || !value.trim()}
-              className="btn-solid flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent)] text-black shadow-sm transition-all duration-200 hover:shadow-md hover:brightness-110 motion-safe:active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
+              className="btn-solid flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--foreground)] shadow-sm transition-all duration-200 hover:opacity-90 hover:shadow-md hover:brightness-110 motion-safe:hover:scale-[1.02] motion-safe:active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
               aria-label="Send message"
             >
               {isLoading ? <IconLoader2 size={22} className="animate-spin" aria-hidden /> : <IconSend size={22} stroke={1.75} aria-hidden />}

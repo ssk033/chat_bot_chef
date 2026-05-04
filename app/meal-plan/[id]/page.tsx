@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { IconArrowLeft, IconMessages, IconPencil, IconTrash } from "@tabler/icons-react";
 import { AppNavbar } from "@/components/app-navbar";
 import { MealPlanPageBackdrop } from "@/components/meal-plan/meal-plan-page-backdrop";
+import { ButtonLink } from "@/components/ui/button";
 import { setMealPlanChatSession } from "@/lib/meal-plan-ai-saves";
 import { mealPlanRecordToChatQuery } from "@/lib/meal-plan-chat-query";
 import {
@@ -71,24 +72,25 @@ export default function MealPlanDetailPage() {
             Saved plans
           </Link>
 
-          <article className="rounded-2xl border border-[color-mix(in_srgb,var(--border)_85%,transparent)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-6 shadow-[0_10px_30px_color-mix(in_srgb,var(--foreground)_12%,transparent)] backdrop-blur-xl md:p-8 dark:border-white/[0.09] dark:bg-[color-mix(in_srgb,var(--surface)_76%,transparent)] dark:shadow-[0_14px_40px_rgba(0,0,0,0.42)]">
-            <header className="border-b border-[var(--border)] pb-6 dark:border-white/[0.06]">
-              <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">{plan.planName}</h1>
+          <article className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_94%,transparent)] p-6 shadow-sm backdrop-blur-xl transition-all duration-200 hover:shadow-md md:p-8">
+            <header className="border-b border-[var(--border-subtle)] pb-6">
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] sm:text-2xl">{plan.planName}</h1>
               <p className="mt-2 text-sm text-[var(--muted-text)]">
                 Last updated {formatWhen(plan.updatedAt)} · {plan.householdSize} people · Created {formatWhen(plan.createdAt)}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Link
+                <ButtonLink
                   href={`/meal-plan/chat?${mealPlanRecordToChatQuery(plan)}`}
                   onClick={() => setMealPlanChatSession({ draftId: plan.id, planName: plan.planName })}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-white shadow-[0_0_18px_-4px_color-mix(in_srgb,var(--icon-green)_35%,transparent)] transition-all hover:brightness-[1.06] motion-safe:active:scale-[0.98]"
+                  variant="primary"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium shadow-sm"
                 >
                   <IconMessages size={17} stroke={1.75} aria-hidden />
                   Open planner chat
-                </Link>
+                </ButtonLink>
                 <Link
                   href={`/meal-plan/create?edit=${plan.id}`}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-muted)] dark:border-white/[0.12]"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-5 py-2.5 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--surface-muted)_88%,var(--foreground)_6%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                 >
                   <IconPencil size={17} stroke={1.75} aria-hidden />
                   Edit intake
@@ -96,7 +98,7 @@ export default function MealPlanDetailPage() {
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 px-5 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] px-5 py-2.5 text-sm font-medium text-[var(--muted-text)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring-focus)]"
                 >
                   <IconTrash size={17} stroke={1.75} aria-hidden />
                   Delete
