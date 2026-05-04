@@ -51,8 +51,42 @@ function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
+function geminiModelCandidates(): string[] {
+  const env = process.env.GEMINI_MODEL?.trim();
+  const list = [
+    env,
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+  ].filter((m): m is string => Boolean(m));
+  return [...new Set(list)];
+}
+
+function parseFoodEstimate(obj: Record<string, unknown>): GeminiFoodEstimate | null {
+  const dish = String(obj.dish ?? "").trim();
+  const calories = Math.round(num(obj.calories));
+  const protein_g = Math.round(num(obj.protein_g) * 10) / 10;
+  const carbs_g = Math.round(num(obj.carbs_g) * 10) / 10;
+  const fats_g = Math.round(num(obj.fats_g) * 10) / 10;
+  const confidence = clamp01(num(obj.confidence));
+
+  if (!dish || !Number.isFinite(calories) || calories < 0) return null;
+  if (![protein_g, carbs_g, fats_g].every((x) => Number.isFinite(x) && x >= 0)) return null;
+
+  return {
+    dish,
+    calories,
+    protein_g,
+    carbs_g,
+    fats_g,
+    confidence: Number.isFinite(confidence) ? confidence : 0.7,
+  };
+}
+
 /**
  * Ask Gemini to identify the dish and estimate macros from the meal photo.
+ * Tries multiple model IDs when the configured model fails (quota, region, etc.).
  */
 export async function estimateFoodWithGeminiVision(args: {
   imageBuffer: Buffer;
@@ -79,37 +113,27 @@ export async function estimateFoodWithGeminiVision(args: {
 
 If multiple dishes appear, pick the dominant/main portion. Round calories/macros to sensible integers.`;
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
-    const model = genAI.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent([
-      { inlineData: { mimeType: mime, data: base64 } },
-      { text: prompt },
-    ]);
-    const text = result.response.text();
-    const obj = extractJsonObject(text);
-    if (!obj) return null;
+  const parts = [
+    { inlineData: { mimeType: mime, data: base64 } },
+    { text: prompt },
+  ] as const;
 
-    const dish = String(obj.dish ?? "").trim();
-    const calories = Math.round(num(obj.calories));
-    const protein_g = Math.round(num(obj.protein_g) * 10) / 10;
-    const carbs_g = Math.round(num(obj.carbs_g) * 10) / 10;
-    const fats_g = Math.round(num(obj.fats_g) * 10) / 10;
-    const confidence = clamp01(num(obj.confidence));
+  const genAI = new GoogleGenerativeAI(apiKey);
 
-    if (!dish || !Number.isFinite(calories) || calories < 0) return null;
-    if (![protein_g, carbs_g, fats_g].every((x) => Number.isFinite(x) && x >= 0)) return null;
+  for (const modelName of geminiModelCandidates()) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent([...parts]);
+      const text = result.response.text();
+      const obj = extractJsonObject(text);
+      if (!obj) continue;
 
-    return {
-      dish,
-      calories,
-      protein_g,
-      carbs_g,
-      fats_g,
-      confidence: Number.isFinite(confidence) ? confidence : 0.7,
-    };
-  } catch {
-    return null;
+      const estimate = parseFoodEstimate(obj);
+      if (estimate) return estimate;
+    } catch {
+      continue;
+    }
   }
+
+  return null;
 }

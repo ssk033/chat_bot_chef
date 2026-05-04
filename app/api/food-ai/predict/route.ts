@@ -5,7 +5,7 @@ import { estimateFoodWithGeminiVision } from "@/lib/gemini-food-vision";
 const UPSTREAM = process.env.FOOD_AI_SERVICE_URL ?? "http://127.0.0.1:8788";
 
 /** When CNN softmax/confidence is strictly below this (0–1), run Gemini Vision on the same image. */
-const CNN_CONFIDENCE_THRESHOLD = 0.6;
+const CNN_CONFIDENCE_THRESHOLD = 0.65;
 
 export const runtime = "nodejs";
 
@@ -15,6 +15,18 @@ function normalizeConfidence(c: unknown): number {
   if (n > 1 && n <= 100) return Math.min(1, Math.max(0, n / 100));
   if (n > 100) return 1;
   return Math.min(1, Math.max(0, n));
+}
+
+/** Food AI servers may name the softmax field differently. */
+function extractCnnConfidence(parsed: Record<string, unknown>): number {
+  const keys = ["confidence", "softmax_confidence", "score", "cnn_confidence", "prob", "probability"] as const;
+  for (const k of keys) {
+    if (k in parsed && parsed[k] != null && parsed[k] !== "") {
+      const v = normalizeConfidence(parsed[k]);
+      return v;
+    }
+  }
+  return 0;
 }
 
 /** Strip fields that would reveal which backend answered (CNN vs Gemini). */
@@ -27,9 +39,21 @@ function sanitizeForClient(body: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
-function cnnBackendOnly(parsed: Record<string, unknown>): string | undefined {
-  const b = parsed.backend;
-  return b === "foodx" || b === "keras" || b === "clip" ? b : undefined;
+function jsonFromGemini(
+  gemini: NonNullable<Awaited<ReturnType<typeof estimateFoodWithGeminiVision>>>,
+  cnnMeta?: Record<string, unknown>,
+) {
+  return sanitizeForClient({
+    dish: gemini.dish,
+    confidence: gemini.confidence,
+    calories: gemini.calories,
+    protein_g: gemini.protein_g,
+    carbs_g: gemini.carbs_g,
+    fats_g: gemini.fats_g,
+    demoMode: typeof cnnMeta?.demoMode === "boolean" ? cnnMeta.demoMode : false,
+    demoLowConfidence: false,
+    demoHint: typeof cnnMeta?.demoHint === "string" ? cnnMeta.demoHint : undefined,
+  });
 }
 
 export async function POST(request: Request) {
@@ -54,11 +78,18 @@ export async function POST(request: Request) {
     });
     text = await res.text();
   } catch {
+    const geminiOnly = await estimateFoodWithGeminiVision({
+      imageBuffer,
+      mimeType,
+    });
+    if (geminiOnly) {
+      return NextResponse.json(jsonFromGemini(geminiOnly));
+    }
     return NextResponse.json(
       {
-        error: `Cannot reach Food AI service at ${UPSTREAM}. Run: npm run food-ai:dev and install ml-models/food-ai-server/requirements.txt`,
+        error: `Cannot reach Food AI service at ${UPSTREAM}. Set GEMINI_API_KEY for Gemini vision fallback, or run npm run food-ai:dev (see ml-models/food-ai-server/requirements.txt).`,
       },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -66,6 +97,13 @@ export async function POST(request: Request) {
   try {
     parsed = JSON.parse(text) as Record<string, unknown>;
   } catch {
+    const geminiOnly = await estimateFoodWithGeminiVision({
+      imageBuffer,
+      mimeType,
+    });
+    if (geminiOnly) {
+      return NextResponse.json(jsonFromGemini(geminiOnly));
+    }
     return new NextResponse(text, {
       status: res.status,
       headers: { "Content-Type": "application/json" },
@@ -73,10 +111,17 @@ export async function POST(request: Request) {
   }
 
   if (!res.ok) {
+    const geminiOnly = await estimateFoodWithGeminiVision({
+      imageBuffer,
+      mimeType,
+    });
+    if (geminiOnly) {
+      return NextResponse.json(jsonFromGemini(geminiOnly));
+    }
     return NextResponse.json(parsed, { status: res.status });
   }
 
-  const conf = normalizeConfidence(parsed.confidence);
+  const conf = extractCnnConfidence(parsed);
   const useGemini = conf < CNN_CONFIDENCE_THRESHOLD;
 
   if (!useGemini) {
@@ -84,7 +129,7 @@ export async function POST(request: Request) {
       sanitizeForClient({
         ...parsed,
         confidence: conf,
-      })
+      }),
     );
   }
 
@@ -100,22 +145,9 @@ export async function POST(request: Request) {
       sanitizeForClient({
         ...parsed,
         confidence: conf,
-      })
+      }),
     );
   }
 
-  return NextResponse.json(
-    sanitizeForClient({
-      dish: gemini.dish,
-      confidence: gemini.confidence,
-      calories: gemini.calories,
-      protein_g: gemini.protein_g,
-      carbs_g: gemini.carbs_g,
-      fats_g: gemini.fats_g,
-      backend: cnnBackendOnly(parsed),
-      demoMode: parsed.demoMode,
-      demoLowConfidence: false,
-      demoHint: parsed.demoHint,
-    })
-  );
+  return NextResponse.json(jsonFromGemini(gemini, parsed));
 }
