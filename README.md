@@ -1,36 +1,116 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Meal-IT!!
 
-## Getting Started
+A production-style web app for **meal planning**, **nutrition logging**, **food photo analysis**, and an AI **Chef** assistant. Built with **Next.js** (App Router), **React**, **TypeScript**, **Tailwind CSS**, and **PostgreSQL** via **Prisma**.
 
-First, run the development server:
+---
+
+## Features
+
+| Area | Description |
+|------|-------------|
+| **Chef chat** | Full-screen conversational assistant with sessions, message history, voice input (where supported), and browser text-to-speech. |
+| **Meal planner** | Intake flow → planner chat; save drafts and planner replies locally for reuse. |
+| **Nutrition tracker** | Client-side macro and calorie logging with totals (no server persistence). |
+| **Food tracker** | Upload a meal photo; dish classification and estimated nutrition via the **Food AI** HTTP service (optional local CNN pipeline). |
+| **Recipes & RAG** | Recipe catalogue in Postgres with optional embeddings for similarity-style retrieval. |
+| **Site guide** | Floating in-app assistant for help across routes. |
+
+For architecture, API routes, env vars, and file index, see **`PROJECT_DOCUMENTATION.txt`** in this folder.
+
+---
+
+## Tech stack
+
+- **Framework:** Next.js 16, React 19  
+- **Language:** TypeScript  
+- **Styling:** Tailwind CSS v4, design tokens (`app/globals.css`)  
+- **Database:** PostgreSQL + Prisma (`prisma/schema.prisma`)  
+- **Icons:** Tabler Icons  
+
+---
+
+## Prerequisites
+
+- **Node.js** (LTS recommended)  
+- **PostgreSQL** with a valid `DATABASE_URL`  
+- Optional: **Python** environment for the local Food AI server (`npm run food-ai:*`)  
+
+---
+
+## Environment variables
+
+Create a `.env` (or `.env.local`) with at least:
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Postgres connection string for Prisma |
+| `GEMINI_API_KEY` | Chef chat, meal planner, site guide, and other conversational AI routes |
+
+Optional:
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_MODEL` | Override default Gemini model id |
+| `FOOD_AI_SERVICE_URL` | Food AI service base URL (default `http://127.0.0.1:8788`) |
+
+---
+
+## Setup
+
+```bash
+npm install
+npx prisma migrate deploy
+```
+
+Seed or load recipe data only if your deployment expects it (see `scripts/` and `PROJECT_DOCUMENTATION.txt`).
+
+---
+
+## Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open **http://localhost:3000**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Quality gate:**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+# or
+npm run verify
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Food AI (optional, local)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+For photo analysis via the dedicated ML service:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run food-ai:dev
+```
 
-## Deploy on Vercel
+Use `npm run food-ai:venv:win` or `npm run food-ai:venv` to prepare the Python environment, and the `food-ai:init-*` scripts if you need demo model assets (see `PROJECT_DOCUMENTATION.txt`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment notes
+
+- Set **`DATABASE_URL`** and run **`npx prisma migrate deploy`** on the host.  
+- **`GEMINI_API_KEY`** is required for AI chat and site-guide behaviour where those routes call Google Generative AI.  
+- The Food AI service is separate; configure **`FOOD_AI_SERVICE_URL`** if the classifier runs remotely instead of on localhost.
+
+---
+
+## Credits
+
+As shown in-app: **Sanidhya, Rajnish, Sachet, Aayush**.
+
+---
+
+## License
+
+Private project (`"private": true` in `package.json`). Adjust if you publish or open-source.
