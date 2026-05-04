@@ -3,32 +3,40 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  IconSend,
-  IconPlayerPlay,
-  IconPlayerStop,
-  IconLoader2,
-  IconMenu2,
-} from "@tabler/icons-react";
+import { IconLayoutDashboard, IconLoader2, IconMenu2 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ChatSidebar, type SessionRow } from "@/components/chat-sidebar";
 import { CHEF_ANONYMOUS_KEY_HEADER } from "@/lib/chef-auth";
 import { getStoredUser } from "@/lib/client-auth";
+import { ChatInput } from "@/components/chat/chat-input";
+import {
+  ChatMessage as ChatBubbleRow,
+  ChefTypingIndicator,
+  type ChatMessageModel,
+} from "@/components/chat/chat-message";
+import { ChefAvatar } from "@/components/chef-avatar";
 
 const LS_DISPLAY_NAME = "chef_display_name";
 const LS_SIDEBAR_COLLAPSED = "chef_sidebar_collapsed";
-type ChatMessage = { id: string; role: string; text: string };
 
-function createMessage(role: string, text: string): ChatMessage {
+function createMessage(role: string, text: string): ChatMessageModel {
   return { id: crypto.randomUUID(), role, text };
+}
+
+function initialsFromDisplayName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "YO";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export default function ChatBotChefPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [modelStatus, setModelStatus] = useState<{ available: boolean; loading: boolean }>({
     available: false,
@@ -46,9 +54,12 @@ export default function ChatBotChefPage() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const lastRequestTime = useRef<number>(0);
   const minRequestInterval = 2000;
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  const userInitials = initialsFromDisplayName(displayName);
 
   const refreshSessions = useCallback(async (key: string) => {
     try {
@@ -98,6 +109,79 @@ export default function ChatBotChefPage() {
     setIsPlaying(false);
     utteranceRef.current = null;
   }
+
+  const stopListening = useCallback(() => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* noop */
+    }
+    recognitionRef.current = null;
+    setIsListening(false);
+  }, []);
+
+  const toggleMic = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const w = window as unknown as {
+      SpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        start(): void;
+        stop(): void;
+        onresult: ((ev: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+        onerror: (() => void) | null;
+        onend: (() => void) | null;
+      };
+      webkitSpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        start(): void;
+        stop(): void;
+        onresult: ((ev: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+        onerror: (() => void) | null;
+        onend: (() => void) | null;
+      };
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) {
+      alert("Voice input is not supported in this browser. Try Chrome or Edge.");
+      return;
+    }
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    const rec = new Ctor();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+    rec.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) setInput((prev) => `${prev ? `${prev} ` : ""}${transcript.trim()}`);
+      stopListening();
+    };
+    rec.onerror = () => stopListening();
+    rec.onend = () => setIsListening(false);
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setIsListening(true);
+    } catch {
+      stopListening();
+    }
+  }, [isListening, stopListening]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        /* noop */
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -197,7 +281,9 @@ export default function ChatBotChefPage() {
             body: JSON.stringify({}),
           });
           if (!cr.ok) {
-            setChatStorageError("Could not create a chat session. Check DATABASE_URL and run: npx prisma migrate deploy");
+            setChatStorageError(
+              "Could not create a chat session. Check DATABASE_URL and run: npx prisma migrate deploy"
+            );
             setReady(true);
             return;
           }
@@ -224,7 +310,7 @@ export default function ChatBotChefPage() {
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+  }, [messages.length, isLoading]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsed((c) => {
@@ -373,7 +459,10 @@ export default function ChatBotChefPage() {
       const waitTime = Math.ceil((minRequestInterval - timeSinceLastRequest) / 1000);
       setMessages((prev) => [
         ...prev,
-        createMessage("bot", `Please wait ${waitTime} second${waitTime > 1 ? "s" : ""} before sending another message.`),
+        createMessage(
+          "bot",
+          `Please wait ${waitTime} second${waitTime > 1 ? "s" : ""} before sending another message.`
+        ),
       ]);
       return;
     }
@@ -434,9 +523,8 @@ export default function ChatBotChefPage() {
     utteranceRef.current = utterance;
 
     const englishVoice =
-      voices.find(
-        (v) => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))
-      ) || voices.find((v) => v.lang.startsWith("en"));
+      voices.find((v) => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))) ||
+      voices.find((v) => v.lang.startsWith("en"));
 
     if (englishVoice) {
       utterance.voice = englishVoice;
@@ -471,7 +559,7 @@ export default function ChatBotChefPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+    <div className="flex h-[100dvh] overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -487,16 +575,20 @@ export default function ChatBotChefPage() {
         onRenameUser={handleRenameUser}
       />
 
-      <div className={`flex h-full min-w-0 flex-1 flex-col ${sidebarCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"}`}>
+      <div
+        className={`flex min-h-0 min-w-0 flex-1 flex-col transition-[margin] duration-200 ease-out ${
+          sidebarCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"
+        }`}
+      >
         <header
-          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface)]/90 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/75 ${
+          className={`fixed top-0 right-0 z-30 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface)]/92 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface)]/78 ${
             sidebarCollapsed ? "md:left-[72px]" : "md:left-[260px]"
-          } left-0`}
+          } left-0 shadow-[0_1px_0_color-mix(in_srgb,var(--border-subtle)_65%,transparent)]`}
         >
-          <div className="flex w-full flex-wrap items-center gap-3 px-3 py-3 sm:px-5 lg:px-6 xl:px-8">
+          <div className="flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <button
               type="button"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--foreground)] transition hover:bg-[var(--surface-muted)] md:hidden"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--foreground)] transition-all duration-200 hover:bg-[var(--surface-muted)] motion-safe:active:scale-95 md:hidden"
               onClick={() => setMobileSidebarOpen(true)}
               aria-label="Open sidebar"
             >
@@ -504,53 +596,27 @@ export default function ChatBotChefPage() {
             </button>
             <Link
               href="/"
-              className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition hover:opacity-80 hover:scale-[1.01] sm:flex-initial sm:gap-3.5"
+              className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl transition-all duration-200 hover:bg-[var(--surface-muted)]/80 hover:opacity-95 motion-safe:hover:scale-[1.01] sm:flex-initial sm:gap-3.5"
               aria-label="Go to homepage"
             >
-              <span className="chef-icon-badge flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10">
-                <span className="text-emerald-950 dark:text-emerald-100">
-                  <svg
-                    width="22"
-                    height="22"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-[22px] w-[22px]"
-                    aria-hidden
-                  >
-                    <path
-                      d="M6 10.5C4.34315 10.5 3 9.15685 3 7.5C3 5.84315 4.34315 4.5 6 4.5C6.64013 4.5 7.23342 4.70042 7.72065 5.04209C8.77899 3.79396 10.3578 3 12.125 3C13.8922 3 15.471 3.79396 16.5294 5.04209C17.0166 4.70042 17.6099 4.5 18.25 4.5C19.9069 4.5 21.25 5.84315 21.25 7.5C21.25 9.15685 19.9069 10.5 18.25 10.5H6Z"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M6.5 10.5V15.5C6.5 17.9853 8.51472 20 11 20H13C15.4853 20 17.5 17.9853 17.5 15.5V10.5"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M10 14H14"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-              </span>
+              <ChefAvatar size={36} sizeSm={40} className="shrink-0" />
               <div className="min-w-0 md:block">
-                <p className="truncate text-sm font-semibold tracking-tight text-gray-900 dark:text-white sm:text-base">
+                <p className="truncate text-base font-semibold tracking-tight text-[var(--foreground)] sm:text-lg">
                   Chef
                 </p>
                 <p className="hidden truncate text-xs text-[var(--muted-text)] sm:block sm:text-[13px]">
-                  Recipe search & cooking Q&A
+                  Recipe assistant
                 </p>
               </div>
             </Link>
             <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+              <Link
+                href="/dashboard"
+                className="glow-pill inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:opacity-95 motion-safe:active:scale-[0.98]"
+              >
+                <IconLayoutDashboard size={18} stroke={1.75} aria-hidden />
+                Dashboard
+              </Link>
               <ThemeToggle />
               {modelStatus.loading ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-[var(--muted-text)]">
@@ -574,158 +640,56 @@ export default function ChatBotChefPage() {
 
         {chatStorageError ? (
           <div
-            className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-800 dark:text-amber-200 sm:text-sm"
+            className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-sm leading-relaxed text-amber-950 dark:text-amber-100 sm:px-6"
             role="status"
           >
             {chatStorageError}
           </div>
         ) : null}
 
-        <main className="mx-auto flex h-full w-full max-w-5xl flex-1 flex-col px-3 pt-20 sm:px-5 lg:px-6 xl:px-8 min-h-0">
-          <section
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] shadow-sm"
-            aria-label="Conversation"
-          >
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="chat-scroll-area min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 touch-pan-y sm:px-5 sm:py-5">
+        <div className="flex min-h-0 flex-1 flex-col pt-[calc(3.5rem+1px)]">
+          <div className="relative flex min-h-0 flex-1 flex-col bg-[var(--background)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,color-mix(in_srgb,var(--accent-muted)_100%,transparent),transparent)] opacity-90 dark:opacity-70" />
+
+            <div className="chat-scroll-area relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y">
+              <div className="mx-auto max-w-[760px] space-y-6 px-5 py-8 sm:space-y-8 sm:px-6 sm:py-10">
                 {messages.length === 0 ? (
-                  <div className="flex min-h-[min(50dvh,20rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[280px]">
-                    <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--surface-muted)] ring-1 ring-[var(--border-subtle)] sm:h-16 sm:w-16">
-                      <svg
-                        width="30"
-                        height="30"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="text-emerald-950 dark:text-emerald-100"
-                        aria-hidden
-                      >
-                        <path
-                          d="M6 10.5C4.34315 10.5 3 9.15685 3 7.5C3 5.84315 4.34315 4.5 6 4.5C6.64013 4.5 7.23342 4.70042 7.72065 5.04209C8.77899 3.79396 10.3578 3 12.125 3C13.8922 3 15.471 3.79396 16.5294 5.04209C17.0166 4.70042 17.6099 4.5 18.25 4.5C19.9069 4.5 21.25 5.84315 21.25 7.5C21.25 9.15685 19.9069 10.5 18.25 10.5H6Z"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M6.5 10.5V15.5C6.5 17.9853 8.51472 20 11 20H13C15.4853 20 17.5 17.9853 17.5 15.5V10.5"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path d="M10 14H14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <h2 className="max-w-md text-base font-medium tracking-tight text-[var(--foreground)] sm:text-lg">
-                      Ask anything about recipes or ingredients
+                  <div className="flex min-h-[min(52dvh,22rem)] flex-col items-center justify-center px-2 text-center sm:min-h-[300px]">
+                    <ChefAvatar size={52} sizeSm={56} className="mb-6 shrink-0 !rounded-2xl shadow-md" />
+                    <h2 className="max-w-md text-lg font-semibold tracking-tight text-[var(--foreground)] sm:text-xl">
+                      What would you like to cook today?
                     </h2>
-                    <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--muted-text)]">
-                      Example: &ldquo;What can I make with chicken and rice?&rdquo;
+                    <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--muted-text)] sm:text-[15px] sm:leading-7">
+                      Ask for recipes, swaps, or meal ideas. Try: &ldquo;What can I make with chicken and rice?&rdquo;
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4 sm:space-y-5">
+                  <>
                     {messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`message-enter flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[min(100%,46rem)] rounded-2xl px-3.5 py-3 text-sm leading-relaxed sm:px-4 sm:text-[15px] sm:leading-relaxed ${
-                            m.role === "user"
-                              ? "bg-[var(--icon-green)] text-[#052e16]"
-                              : "bg-[var(--surface-muted)] text-[var(--foreground)] ring-1 ring-[var(--border-subtle)]"
-                          }`}
-                        >
-                          <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--muted-text)]">
-                            {m.role === "user" ? "You" : "Chef"}
-                          </div>
-                          <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                        </div>
-                      </div>
+                      <ChatBubbleRow key={m.id} message={m} userInitials={userInitials} />
                     ))}
-                    {isLoading && (
-                      <div className="message-enter flex justify-start">
-                        <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface-muted)] px-3.5 py-3 text-sm text-[var(--muted-text)] ring-1 ring-[var(--border-subtle)] sm:px-4">
-                          <span className="typing-dot" />
-                          <span className="typing-dot [animation-delay:0.2s]" />
-                          <span className="typing-dot [animation-delay:0.4s]" />
-                        </div>
-                      </div>
-                    )}
-                    <div ref={scrollAnchorRef} aria-hidden className="h-px w-full shrink-0" />
-                  </div>
+                    {isLoading ? <ChefTypingIndicator /> : null}
+                  </>
                 )}
+                <div ref={scrollAnchorRef} aria-hidden className="h-px w-full shrink-0" />
               </div>
             </div>
-          </section>
 
-          <section
-            className="sticky bottom-0 mt-4 shrink-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]/95 p-3 shadow-sm backdrop-blur sm:p-4"
-            aria-label="Message composer"
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-3">
-              <label className="sr-only" htmlFor="chat-input">
-                Message
-              </label>
-              <input
-                id="chat-input"
-                className="min-h-[48px] w-full min-w-0 flex-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3.5 py-3 text-base text-[var(--foreground)] placeholder:text-[var(--muted-text)] outline-none transition-shadow focus:border-[var(--input-border-focus)] focus:ring-2 focus:ring-[var(--ring-focus)] disabled:opacity-60 sm:px-4 sm:text-sm"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder="Describe ingredients or ask for a recipe..."
-                disabled={isLoading}
-                autoComplete="off"
-                enterKeyHint="send"
-              />
-              <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch sm:gap-2 lg:shrink-0">
-                <button
-                  type="button"
-                  onClick={() => void send()}
-                  disabled={isLoading || !input.trim()}
-                  className="inline-flex h-12 min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--user-bubble-bg)] px-4 text-sm font-medium text-[var(--user-bubble-fg)] transition hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-[7.75rem]"
-                >
-                  {isLoading ? (
-                    <IconLoader2 size={20} className="animate-spin" aria-hidden />
-                  ) : (
-                    <IconSend size={20} stroke={1.75} aria-hidden />
-                  )}
-                  Send
-                </button>
-                {isPlaying ? (
-                  <button
-                    type="button"
-                    onClick={stopAudio}
-                    className="inline-flex h-12 min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 text-sm font-medium transition hover:opacity-90 sm:w-auto sm:min-w-[6.75rem]"
-                  >
-                    <IconPlayerStop size={20} stroke={1.75} aria-hidden />
-                    Stop
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={playLatestWithBrowserTTS}
-                    disabled={!hasBotReply}
-                    className="inline-flex h-12 min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 text-sm font-medium transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-[6.75rem]"
-                  >
-                    <IconPlayerPlay size={20} stroke={1.75} aria-hidden />
-                    Speak
-                  </button>
-                )}
-              </div>
-            </div>
-            <p className="mt-3 text-center text-[11px] leading-snug text-[var(--muted-text)]">
-              Browser text-to-speech · Enter to send · {minRequestInterval / 1000}s between messages
-            </p>
-          </section>
-        </main>
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={() => void send()}
+              isLoading={isLoading}
+              isListening={isListening}
+              onMicToggle={toggleMic}
+              hasBotReply={hasBotReply}
+              isPlayingTTS={isPlaying}
+              onSpeak={playLatestWithBrowserTTS}
+              onStopSpeak={stopAudio}
+              helperText={`Browser text-to-speech · Voice input where supported · Enter to send · ${minRequestInterval / 1000}s between messages`}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

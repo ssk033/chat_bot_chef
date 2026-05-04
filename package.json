@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:webpack": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "postinstall": "prisma generate",
@@ -20,8 +21,8 @@
     "food-ai:init-demo-foodx": "node scripts/food-ai-run-python.mjs init_demo_foodx.py"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
     "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^6.19.3",
     "@tabler/icons-react": "^3.35.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
@@ -30,6 +31,7 @@
     "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-dropzone": "^15.0.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

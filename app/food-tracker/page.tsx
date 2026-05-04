@@ -2,8 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { FoodTrackerHistorySidebar } from "@/components/food-tracker/food-tracker-history-sidebar";
 import { AppNavbar } from "@/components/app-navbar";
+import { FileUpload } from "@/components/ui/file-upload";
 import { getStoredUser } from "@/lib/client-auth";
+import {
+  clearFoodTrackerHistory,
+  fileToThumbnailDataUrl,
+  loadFoodTrackerHistory,
+  prependFoodTrackerHistory,
+  removeFoodTrackerHistoryEntry,
+  type FoodTrackerHistoryEntry,
+} from "@/lib/food-tracker-history";
 
 type PredictResult = {
   dish: string;
@@ -41,9 +51,17 @@ export default function FoodTrackerPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
+  const [history, setHistory] = useState<FoodTrackerHistoryEntry[]>([]);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
+  const [historyThumbUrl, setHistoryThumbUrl] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authorized) router.replace("/auth/login?next=/food-tracker");
   }, [authorized, router]);
+
+  useEffect(() => {
+    setHistory(loadFoodTrackerHistory());
+  }, []);
 
   useEffect(() => {
     setReviewRating(null);
@@ -65,6 +83,32 @@ export default function FoodTrackerPage() {
   }, [file]);
 
   const canSubmit = useMemo(() => Boolean(file) && !loading, [file, loading]);
+
+  const displayPreviewSrc = historyThumbUrl ?? previewUrl;
+
+  const applyHistoryEntry = (entry: FoodTrackerHistoryEntry) => {
+    setHistoryThumbUrl(entry.thumbDataUrl);
+    setResult(entry.result);
+    setFile(null);
+    setError(null);
+    setActiveHistoryId(entry.id);
+  };
+
+  const removeHistoryId = (id: string) => {
+    setHistory((prev) => removeFoodTrackerHistoryEntry(prev, id));
+    if (activeHistoryId === id) {
+      setActiveHistoryId(null);
+      setHistoryThumbUrl(null);
+      setResult(null);
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory(clearFoodTrackerHistory());
+    setActiveHistoryId(null);
+    setHistoryThumbUrl(null);
+    setResult(null);
+  };
 
   const analyze = async () => {
     if (!file) return;
@@ -99,7 +143,7 @@ export default function FoodTrackerPage() {
         ext.backend === "foodx" || ext.backend === "keras" || ext.backend === "clip"
           ? ext.backend
           : backend;
-      setResult({
+      const nextResult: PredictResult = {
         dish: data.dish,
         confidence: data.confidence,
         calories: data.calories,
@@ -112,7 +156,22 @@ export default function FoodTrackerPage() {
         demoHint: typeof ext.demoHint === "string" ? ext.demoHint : undefined,
         suppressedGuess: typeof ext.suppressedGuess === "string" ? ext.suppressedGuess : undefined,
         clipLabelCount: typeof ext.clipLabelCount === "number" ? ext.clipLabelCount : undefined,
-      });
+      };
+      setResult(nextResult);
+
+      void fileToThumbnailDataUrl(file)
+        .then((thumb) => {
+          const entry: FoodTrackerHistoryEntry = {
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            thumbDataUrl: thumb,
+            filename: file.name,
+            result: nextResult,
+          };
+          setHistory((prev) => prependFoodTrackerHistory(prev, entry));
+          setActiveHistoryId(entry.id);
+        })
+        .catch(() => {});
     } catch {
       setError("Network error while analyzing the image.");
     } finally {
@@ -131,30 +190,32 @@ export default function FoodTrackerPage() {
   return (
     <div className="relative min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat dark:hidden"
+        className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center bg-no-repeat dark:hidden"
         style={{ backgroundImage: "url('/food%20background%20light%20theme.png')" }}
       />
       <div
-        className="pointer-events-none absolute inset-0 hidden bg-cover bg-center bg-no-repeat dark:block"
-        style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+        className="pointer-events-none absolute inset-0 z-0 hidden bg-cover bg-center bg-no-repeat dark:block"
+        style={{ backgroundImage: "url('/food%20backgorund%20dark%20theme.png')" }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-white/35 dark:bg-black/50" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-black/45 backdrop-blur-[1px] dark:bg-black/60" />
       <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-4xl px-4 py-10">
-        <div className="theme-panel mb-6 rounded-2xl p-6">
+      <main className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
+          <div className="min-w-0 flex-1 space-y-8">
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-3xl font-bold">Food Tracker</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">Food Tracker</h1>
             <ModelStatusPill loading={loading} showError={Boolean(error)} />
           </div>
-          <p className="mt-2 text-sm text-justify text-[var(--muted-text)]">
+          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
             Upload a clear photo of your plate. We show a dish name and rough calories, protein, carbs, and fat,
             useful for tracking and not as exact as weighing food.
           </p>
-          <p className="mt-2 text-sm text-justify text-[var(--muted-text)]">
+          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
             The food AI runs when you tap analyze. It compares your picture to a list of dishes, picks the closest
             match, and fills nutrition from typical servings for that dish.
           </p>
-          <p className="mt-2 text-sm text-justify text-[var(--muted-text)]">
+          <p className="mt-3 text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/70">
             The vision side uses <strong>CNNs</strong> (<strong>convolutional neural networks</strong>), models that
             learn patterns in pixels for images. They are trained or fine-tuned on <strong>food photo datasets</strong>,
             with many labelled meal pictures paired with dish names. These often blend large public benchmarks with
@@ -162,49 +223,56 @@ export default function FoodTrackerPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <section className="theme-panel rounded-2xl p-5">
-            <h2 className="mb-3 text-lg font-semibold">Upload image</h2>
-            <input
-              type="file"
-              accept="image/*"
-              className="w-full text-sm text-[var(--muted-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--user-bubble-bg)] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--user-bubble-fg)]"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setFile(f);
-                setResult(null);
-                setError(null);
-              }}
-            />
-            {previewUrl ? (
-              <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border-subtle)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt="Preview" className="max-h-64 w-full object-contain" />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Upload image</h2>
+            <div className="flex flex-1 flex-col space-y-4">
+              <div className="overflow-hidden rounded-xl border border-dashed border-[color-mix(in_srgb,var(--border-subtle)_88%,var(--accent)_12%)] bg-[color-mix(in_srgb,var(--surface-muted)_28%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_18%,var(--surface)_82%)] dark:ring-white/[0.05]">
+                <FileUpload
+                  accept={{ "image/*": [] }}
+                  multiple={false}
+                  onChange={(files) => {
+                    const f = files[0] ?? null;
+                    setHistoryThumbUrl(null);
+                    setActiveHistoryId(null);
+                    setFile(f);
+                    setResult(null);
+                    setError(null);
+                  }}
+                />
               </div>
-            ) : null}
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={analyze}
-              className="btn-solid mt-4 w-full rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Analyzing…" : "Recognize dish & estimate nutrition"}
-            </button>
-            {error ? (
-              <p className="mt-3 whitespace-pre-line text-justify rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-                {error}
-              </p>
-            ) : null}
+              {displayPreviewSrc ? (
+                <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-muted)_55%,transparent)] ring-1 ring-black/[0.03] dark:bg-[color-mix(in_srgb,var(--surface-muted)_35%,var(--surface)_65%)] dark:ring-white/[0.05]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={displayPreviewSrc} alt="Preview" className="max-h-64 w-full object-contain" />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={!canSubmit}
+                onClick={analyze}
+                className="mt-auto w-full rounded-xl bg-green-500 py-3 text-sm font-medium text-black shadow-[0_0_20px_rgba(34,197,94,0.2)] transition-all duration-200 hover:bg-green-400 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-green-500 disabled:motion-safe:active:scale-100"
+              >
+                {loading ? "Analyzing…" : "Recognize dish & estimate nutrition"}
+              </button>
+              {error ? (
+                <p className="mt-1 whitespace-pre-line text-justify rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                  {error}
+                </p>
+              ) : null}
+            </div>
           </section>
 
-          <section className="theme-panel rounded-2xl p-5">
-            <h2 className="mb-3 text-lg font-semibold">Result</h2>
+          <section className="flex min-h-[400px] flex-col rounded-2xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_85%,transparent)] p-6 shadow-[0_12px_36px_-14px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-md transition-all duration-200 dark:bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] dark:shadow-[0_14px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.06] motion-safe:hover:scale-[1.02] motion-safe:hover:bg-[color-mix(in_srgb,var(--surface-muted)_70%,var(--surface)_30%)] motion-safe:hover:shadow-lg motion-safe:hover:ring-[var(--accent)]/18 md:min-h-[440px]">
+            <h2 className="mb-4 text-lg font-semibold tracking-tight text-[var(--foreground)]">Result</h2>
             {!result ? (
-              <p className="text-sm text-justify text-[var(--muted-text)]">
-                Results appear here after analysis.
-              </p>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 py-8 text-center">
+                <p className="text-sm leading-relaxed text-justify text-[var(--muted-text)] dark:text-white/60">
+                  Results appear here after analysis.
+                </p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex flex-1 flex-col space-y-4">
                 {result.demoLowConfidence ? (
                   <p className="rounded-lg border border-red-400/45 bg-red-500/10 p-3 text-sm text-justify text-red-800 dark:text-red-200">
                     <strong>Not sure.</strong> This photo did not match strongly enough. Try a clearer, well lit shot with
@@ -237,7 +305,7 @@ export default function FoodTrackerPage() {
                     setReviewThanks(false);
                     setReviewError(null);
                   }}
-                  className="btn-solid mt-4 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--background)]"
+                  className="btn-solid mt-auto w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)] shadow-sm transition-all duration-200 hover:bg-[var(--background)] motion-safe:active:scale-[0.98] dark:border-white/10"
                 >
                   Review this result
                 </button>
@@ -389,6 +457,17 @@ export default function FoodTrackerPage() {
             </div>
           </div>
         ) : null}
+          </div>
+
+          <FoodTrackerHistorySidebar
+            className="w-full shrink-0 lg:w-[300px] lg:sticky lg:top-24 lg:self-start"
+            entries={history}
+            activeId={activeHistoryId}
+            onSelect={applyHistoryEntry}
+            onRemove={removeHistoryId}
+            onClear={clearHistory}
+          />
+        </div>
       </main>
     </div>
   );
@@ -397,10 +476,10 @@ export default function FoodTrackerPage() {
 function ModelStatusPill({ loading, showError }: { loading: boolean; showError: boolean }) {
   if (loading) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/35 bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-950 dark:text-amber-100">
+      <span className="inline-flex animate-pulse items-center gap-2 rounded-full bg-yellow-400/10 px-3 py-1 text-xs font-medium text-yellow-900 dark:text-yellow-300">
         <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-70 dark:bg-yellow-300" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-500 dark:bg-yellow-400" />
         </span>
         Working on your photo…
       </span>
@@ -471,9 +550,9 @@ function parseApiError(data: { error?: string; detail?: unknown }, status: numbe
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3">
+    <div className="rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-muted)_85%,transparent)] p-3 shadow-sm ring-1 ring-black/[0.03] transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_28%,var(--border-subtle))] hover:ring-[var(--accent)]/12 dark:bg-[color-mix(in_srgb,var(--surface-muted)_72%,var(--surface)_28%)] dark:ring-white/[0.05]">
       <p className="text-xs text-[var(--muted-text)]">{label}</p>
-      <p className="text-lg font-semibold">{value}</p>
+      <p className="text-lg font-semibold tracking-tight">{value}</p>
     </div>
   );
 }

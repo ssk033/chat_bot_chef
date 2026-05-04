@@ -1,8 +1,19 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { IconArrowLeft, IconBookmark } from "@tabler/icons-react";
+import { AssistantModal } from "@/components/chat/assistant-modal";
+import { ChatInput } from "@/components/chat/chat-input";
+import { ChatMessage, ChefTypingIndicator } from "@/components/chat/chat-message";
 import { AppNavbar } from "@/components/app-navbar";
+import { MealPlanPageBackdrop } from "@/components/meal-plan/meal-plan-page-backdrop";
+import { sanitizeAssistantDisplayText } from "@/lib/sanitize-chat-display";
+import {
+  appendAiSavedPlan,
+  getMealPlanChatSession,
+} from "@/lib/meal-plan-ai-saves";
 
 type Msg = { id: string; role: "user" | "bot"; text: string };
 
@@ -11,13 +22,26 @@ function MealPlanChatContent() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saveBanner, setSaveBanner] = useState<string | null>(null);
 
   const initialPrompt = useMemo(() => {
-    const ingredients = params.get("ingredients") || "";
-    const dietaryRestrictions = params.get("dietaryRestrictions") || "none";
-    const allergies = params.get("allergies") || "none";
-    const proteinTarget = params.get("proteinTarget") || "not specified";
-    return `Generate a meal plan with ingredients: ${ingredients}. Dietary restrictions: ${dietaryRestrictions}. Allergies: ${allergies}. Protein target: ${proteinTarget} grams/day. Use only recipes that match these ingredients and restrictions.`;
+    const planName = params.get("planName")?.trim() || "Meal plan";
+    const householdSize = params.get("householdSize")?.trim() || "not specified";
+    const ingredients = params.get("ingredients")?.trim() || "";
+    const dietaryRestrictions = params.get("dietaryRestrictions")?.trim() || "none";
+    const allergies = params.get("allergies")?.trim() || "none";
+    const proteinTarget = params.get("proteinTarget")?.trim() || "not specified";
+
+    return [
+      `Plan title: ${planName}.`,
+      `Household size: ${householdSize} people.`,
+      `Ingredients / pantry on hand: ${ingredients}.`,
+      `Dietary preferences / restrictions: ${dietaryRestrictions}.`,
+      `Allergies (must avoid): ${allergies}.`,
+      `Protein target (if given): ${proteinTarget} (interpret as grams/day only when it looks like a number).`,
+      "",
+      "You are the Meal Planner assistant (not general small-talk). Suggest concrete meals and a simple weekly outline using the ingredients when possible. Use concise bullets. If you reference recipes, keep portions realistic for the household size.",
+    ].join("\n");
   }, [params]);
 
   useEffect(() => {
@@ -30,11 +54,15 @@ function MealPlanChatContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: initialPrompt }),
         });
-        const data = await res.json();
+        const data = (await res.json()) as { reply?: string };
         if (!mounted) return;
         setMessages([
           { id: crypto.randomUUID(), role: "user", text: initialPrompt },
-          { id: crypto.randomUUID(), role: "bot", text: data.reply || "No plan generated." },
+          {
+            id: crypto.randomUUID(),
+            role: "bot",
+            text: data.reply || "No plan generated. Try tweaking ingredients or check /api/query logs.",
+          },
         ]);
       } finally {
         if (mounted) setLoading(false);
@@ -58,84 +86,115 @@ function MealPlanChatContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userText }),
       });
-      const data = await res.json();
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "bot", text: data.reply || "No response." }]);
+      const data = (await res.json()) as { reply?: string };
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "bot",
+          text: data.reply || "No response.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const savePlan = () => {
+  const saveLatestPlannerReply = useCallback(() => {
     const lastBot = [...messages].reverse().find((m) => m.role === "bot");
     if (!lastBot) return;
-    const existing = JSON.parse(localStorage.getItem("meal_it_saved_plans") || "[]") as Array<{
-      id: string;
-      name: string;
-      content: string;
-      createdAt: string;
-    }>;
-    const next = [
-      {
-        id: crypto.randomUUID(),
-        name: `Meal Plan #${existing.length + 1}`,
-        content: lastBot.text,
-        createdAt: new Date().toISOString(),
-      },
-      ...existing,
-    ];
-    localStorage.setItem("meal_it_saved_plans", JSON.stringify(next));
-    alert("Meal plan saved!");
-  };
+    const session = getMealPlanChatSession();
+    const defaultName = `Planner suggestion ${new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(new Date())}`;
+    const name = session?.planName ? `${session.planName}, reply` : defaultName;
+    appendAiSavedPlan({ name, content: lastBot.text });
+    setSaveBanner(sanitizeAssistantDisplayText(`Saved "${name}", view under Saved meal plans.`));
+    window.setTimeout(() => setSaveBanner(null), 4500);
+  }, [messages]);
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div className="relative flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
+      <MealPlanPageBackdrop />
       <AppNavbar />
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Meal Plan Chat</h1>
+      <main className="relative z-10 mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/meal-plan/create"
+              className="inline-flex items-center gap-2 text-sm font-medium text-[var(--muted-text)] hover:text-[var(--foreground)]"
+            >
+              <IconArrowLeft size={18} stroke={1.75} aria-hidden />
+              Edit intake
+            </Link>
+            <Link
+              href="/meal-plan/saved"
+              className="text-sm font-medium text-[var(--accent)] underline-offset-4 hover:underline"
+            >
+              Saved plans
+            </Link>
+          </div>
           <button
-            onClick={savePlan}
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2 text-sm font-medium"
+            type="button"
+            onClick={saveLatestPlannerReply}
+            disabled={loading || messages.filter((m) => m.role === "bot").length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface)_80%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] shadow-sm backdrop-blur transition-all hover:bg-[var(--surface-muted)] disabled:pointer-events-none disabled:opacity-45 dark:border-white/[0.1]"
           >
-            Save Plan
+            <IconBookmark size={18} stroke={1.75} aria-hidden />
+            Save latest reply
           </button>
         </div>
 
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-          <div className="mb-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-            {messages.map((m) => (
-              <div key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
-                <div
-                  className={`inline-block max-w-[90%] rounded-xl px-4 py-3 text-sm ${
-                    m.role === "user"
-                      ? "bg-[var(--user-bubble-bg)] text-[var(--user-bubble-fg)]"
-                      : "border border-[var(--border-subtle)] bg-[var(--surface-muted)]"
-                  }`}
-                >
-                  <p className="mb-1 text-xs opacity-70">{m.role === "user" ? "You" : "Chef"}</p>
-                  <p className="whitespace-pre-wrap">{m.text}</p>
-                </div>
-              </div>
-            ))}
-            {loading ? <p className="text-sm text-[var(--muted-text)]">Thinking...</p> : null}
-          </div>
+        {saveBanner ? (
+          <p
+            className="rounded-xl border border-[var(--accent)]/35 bg-[var(--accent-muted)] px-4 py-3 text-sm leading-relaxed text-[var(--foreground)] dark:text-white/70"
+            role="status"
+          >
+            {saveBanner}
+          </p>
+        ) : null}
 
-          <div className="flex gap-2">
-            <input
+        <p className="text-xs text-[color-mix(in_srgb,var(--foreground)_58%,transparent)] dark:text-white/60">
+          Separate from main Chef chat (same assistant styling).
+        </p>
+
+        <AssistantModal
+          title="Meal planner"
+          subtitle="Weekly outline, swaps, and tweaks"
+          className="w-full max-h-[min(80vh,calc(100dvh-10rem))]"
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+              <div className="mx-auto max-w-[760px] space-y-4 px-2 py-3 sm:px-4 sm:py-4">
+                {messages.map((m) => (
+                  <ChatMessage
+                    key={m.id}
+                    message={{
+                      id: m.id,
+                      role: m.role === "user" ? "user" : "assistant",
+                      text: m.text,
+                    }}
+                    userInitials="YO"
+                    assistantLabel="Planner"
+                  />
+                ))}
+                {loading ? <ChefTypingIndicator assistantLabel="Planner" /> : null}
+              </div>
+            </div>
+
+            <ChatInput
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => (e.key === "Enter" ? void send() : null)}
-              placeholder="Ask follow-up..."
-              className="flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2"
+              onChange={setInput}
+              onSend={() => void send()}
+              isLoading={loading}
+              isListening={false}
+              onMicToggle={() => {}}
+              hasBotReply={false}
+              isPlayingTTS={false}
+              onSpeak={() => {}}
+              onStopSpeak={() => {}}
+              helperText="Enter to send · Separate planner assistant"
             />
-            <button
-              onClick={send}
-              className="rounded-lg bg-[var(--user-bubble-bg)] px-4 py-2 text-sm font-medium text-[var(--user-bubble-fg)]"
-            >
-              Send
-            </button>
           </div>
-        </section>
+        </AssistantModal>
       </main>
     </div>
   );
@@ -143,7 +202,13 @@ function MealPlanChatContent() {
 
 export default function MealPlanChatPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] p-6">Loading meal plan chat...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--muted-text)]">
+          Loading meal planner…
+        </div>
+      }
+    >
       <MealPlanChatContent />
     </Suspense>
   );

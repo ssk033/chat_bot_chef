@@ -15,15 +15,17 @@ import {
 type ChatRole = "user" | "assistant";
 
 type ChatMessage = {
+  id: string;
   role: ChatRole;
   content: string;
   localOnly?: boolean;
 };
 
 const WELCOME: ChatMessage = {
+  id: "welcome",
   role: "assistant",
   content:
-    "Hi — I'm **Guide**, your site assistant. Ask me where anything lives (meal plans, Chef chat, photo food tracker, nutrition log), or say you're new and I'll walk you through.",
+    "Hi, I'm **Guide**, your site assistant. Ask me where anything lives (meal plans, Chef chat, photo food tracker, nutrition log), or say you're new and I'll walk you through.",
   localOnly: true,
 };
 
@@ -61,7 +63,8 @@ export function SiteGuideAssistant() {
     if (!text || pending) return;
 
     setInput("");
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
+    const userTurn: ChatMessage = { id: crypto.randomUUID(), role: "user", content: text };
+    const nextMessages: ChatMessage[] = [...messages, userTurn];
     setMessages(nextMessages);
     setPending(true);
 
@@ -91,14 +94,14 @@ export function SiteGuideAssistant() {
       const reply = typeof data?.reply === "string" ? data.reply : "";
       if (!reply) throw new Error("No reply from assistant.");
 
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: reply }]);
     } catch (e: unknown) {
       console.warn("[site-guide-assistant]", e);
       const fallback =
         "I couldn't reach the guide service. Confirm **GEMINI_API_KEY** is in `.env`, restart the dev server, and try again.";
       const msg =
         e instanceof Error && e.message.trim() ? e.message.trim() : fallback;
-      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: msg }]);
     } finally {
       setPending(false);
     }
@@ -147,9 +150,9 @@ export function SiteGuideAssistant() {
               ref={scrollRef}
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3"
             >
-              {messages.map((m, i) => (
+              {messages.map((m) => (
                 <div
-                  key={`${i}-${m.role}`}
+                  key={m.id}
                   className={[
                     "flex gap-2 text-sm leading-relaxed",
                     m.role === "user" ? "justify-end" : "justify-start",
@@ -190,7 +193,7 @@ export function SiteGuideAssistant() {
                       void send();
                     }
                   }}
-                  placeholder="e.g. I'm new — where do I start?"
+                  placeholder="e.g. I'm new, where do I start?"
                   className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-text)]"
                   disabled={pending}
                   aria-label="Message to site guide"

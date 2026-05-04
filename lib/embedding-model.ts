@@ -7,11 +7,16 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-const INFERENCE_SCRIPT = path.join(process.cwd(), 'scripts', 'inference.py');
+/** Prevent Turbopack from tracing the entire repo via open-ended `process.cwd()` joins (NFT warning). */
+function rootJoin(...segments: string[]): string {
+  return path.join(/* turbopackIgnore: true */ process.cwd(), ...segments);
+}
+
+const INFERENCE_SCRIPT = rootJoin('scripts', 'inference.py');
 
 const MODEL_DIR_CANDIDATES = [
-  path.join(process.cwd(), 'models', 'recipe-embedder'),
-  path.join(process.cwd(), 'RecipeModel', 'models', 'recipe-embedder'),
+  rootJoin('models', 'recipe-embedder'),
+  rootJoin('RecipeModel', 'models', 'recipe-embedder'),
 ];
 
 function resolveModelDir(): string | null {
@@ -139,12 +144,16 @@ async function generateEmbeddingWithHuggingFace(text: string): Promise<number[]>
         throw new Error('Invalid embedding format received');
       }
       
-      console.log(`✅ Successfully used model: ${model} (${embedding.length} dimensions)`);
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[embedding] OK ${model} (${embedding.length} dims)`);
+      }
       return embedding;
       
     } catch (error: any) {
       lastError = error;
-      console.warn(`Model ${model} failed:`, error.message);
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[embedding] ${model} failed:`, error.message);
+      }
       // Continue to next model
       continue;
     }
@@ -258,7 +267,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         setCachedEmbedding(cacheKey, embedding);
         return embedding;
       } catch (error: any) {
-        console.warn('Local model failed, falling back to Hugging Face API:', error.message);
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[embedding] Local model failed, using HF API:", error.message);
+        }
       }
     }
 

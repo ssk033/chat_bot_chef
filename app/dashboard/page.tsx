@@ -1,36 +1,64 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useSyncExternalStore } from "react";
+import Image from "next/image";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { IconMessageCircle } from "@tabler/icons-react";
 import { AppNavbar } from "@/components/app-navbar";
+import { DashboardCard, type DashboardCardIconId } from "@/components/dashboard/dashboard-card";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { getStoredUser } from "@/lib/client-auth";
+import { cn } from "@/lib/utils";
 
-const cards = [
+function subscribeHtmlDark(cb: () => void) {
+  if (typeof document === "undefined") return () => {};
+  const el = document.documentElement;
+  const obs = new MutationObserver(cb);
+  obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+  return () => obs.disconnect();
+}
+
+function readHtmlIsDark(): boolean {
+  return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+}
+
+type CardConfig = {
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+  iconId: DashboardCardIconId;
+};
+
+const cards: CardConfig[] = [
   {
     title: "Create Meal Plan",
-    description: "Build a personalized plan from your ingredients and goals.",
+    description: "Start from ingredients and goals to generate a fresh weekly plan you can edit anytime.",
     href: "/meal-plan/create",
     cta: "Start Planning",
+    iconId: "meal",
   },
   {
     title: "Saved Meal Plans",
-    description: "Review and manage your previously saved plans.",
+    description: "Open drafts and finished plans, tweak servings, and reuse what already worked.",
     href: "/meal-plan/saved",
     cta: "Open Saved Plans",
+    iconId: "saved",
   },
   {
     title: "Nutrition Tracker",
-    description: "Track daily calories and macros quickly.",
+    description: "Log calories and macros in one view so you can spot trends without extra spreadsheets.",
     href: "/nutrition/tracker",
     cta: "Track Nutrition",
+    iconId: "nutrition",
   },
   {
     title: "Food Tracker",
-    description: "Upload a meal photo — CNN recognizes the dish and shows calories & protein.",
+    description: "Upload a meal photo to classify the dish and surface calories and protein at a glance.",
     href: "/food-tracker",
-    cta: "Analyze photo",
+    cta: "Analyze Photo",
+    iconId: "food",
   },
 ];
 
@@ -41,6 +69,9 @@ export default function DashboardPage() {
     () => Boolean(getStoredUser()),
     () => false
   );
+  const isDark = useSyncExternalStore(subscribeHtmlDark, readHtmlIsDark, () => false);
+  const [lightBgSrc, setLightBgSrc] = useState("/dashboard-bg-light.png");
+  const [darkBgSrc, setDarkBgSrc] = useState("/dashboard-bg-dark.png");
 
   useEffect(() => {
     if (!isAuthorized) {
@@ -58,56 +89,87 @@ export default function DashboardPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
+      {/* Full-bleed photos via next/image (CSS url() was flaky); fallback paths if copied assets missing */}
       <div
-        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat dark:hidden"
-        style={{ backgroundImage: "url('/food%20background%20light%20theme.png')" }}
-      />
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+        aria-hidden
+        suppressHydrationWarning
+      >
+        <Image
+          alt=""
+          src={lightBgSrc}
+          fill
+          sizes="100vw"
+          quality={90}
+          className={cn(
+            "object-cover object-center transition-opacity duration-300",
+            isDark ? "opacity-0" : "opacity-[0.52]"
+          )}
+          onError={() => setLightBgSrc("/food%20background%20light%20theme.png")}
+          priority={false}
+        />
+        <Image
+          alt=""
+          src={darkBgSrc}
+          fill
+          sizes="100vw"
+          quality={90}
+          className={cn(
+            "object-cover object-center transition-opacity duration-300",
+            isDark ? "opacity-[0.52]" : "opacity-0"
+          )}
+          onError={() => setDarkBgSrc("/food%20backgorund%20dark%20theme.png")}
+          priority={false}
+        />
+      </div>
       <div
-        className="pointer-events-none absolute inset-0 hidden bg-cover bg-center bg-no-repeat dark:block"
-        style={{ backgroundImage: "url('/food%20backgorund.png')" }}
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[1]",
+          isDark
+            ? "bg-[color-mix(in_srgb,var(--background)_54%,transparent)]"
+            : "bg-[color-mix(in_srgb,var(--background)_48%,transparent)]"
+        )}
+        aria-hidden
       />
-      <div className="pointer-events-none absolute inset-0 bg-white/35 dark:bg-black/50" />
-      <AppNavbar />
-      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
-        <div className="theme-panel mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl p-6 sm:p-8">
-          <div>
-            <h1 className="text-3xl font-bold sm:text-4xl">Meal-IT!! Dashboard</h1>
-            <p className="mt-1 text-sm text-[var(--muted-text)] sm:text-base">
-              Built by Sanidhya, Rajnish, Sachet, Aayush
-            </p>
-          </div>
-          <Link
-            href="/chat-bot-chef"
-            className="glow-pill inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-[var(--foreground)] hover:opacity-90 sm:text-base"
-          >
-            <IconMessageCircle size={18} />
-            Talk to Chef!!
-          </Link>
-        </div>
 
-        <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6 xl:gap-8">
-          {cards.map((card) => (
-            <div
-              key={card.title}
-              className="theme-panel flex min-h-[220px] flex-col justify-between rounded-2xl p-8 sm:min-h-[260px] lg:min-h-[280px] lg:p-7 xl:p-8"
+      <AppNavbar />
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+        <DashboardHeader
+          title="Meal-IT!! Dashboard"
+          subtitle="Built by Sanidhya, Rajnish, Sachet, Aayush. Jump into planning, tracking, or chat from one place."
+          action={
+            <Link
+              href="/chat-bot-chef"
+              className="glow-pill inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-medium text-[var(--foreground)] transition-all duration-200 hover:brightness-[1.03] motion-safe:active:scale-[0.98]"
             >
-              <div>
-                <h2 className="mb-3 text-xl font-semibold leading-tight sm:text-2xl lg:text-xl xl:text-[1.35rem]">
-                  {card.title}
-                </h2>
-                <p className="text-base leading-relaxed text-[var(--muted-text)] sm:text-[0.9375rem] lg:text-sm xl:text-base">
-                  {card.description}
-                </p>
-              </div>
-              <Link
+              <IconMessageCircle size={18} stroke={1.75} aria-hidden />
+              Talk to Chef
+            </Link>
+          }
+        />
+
+        <section aria-labelledby="quick-actions-heading" className="space-y-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <h2 id="quick-actions-heading" className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-text)]">
+              Quick Actions
+            </h2>
+            <p className="text-xs text-[var(--muted-text)] sm:text-right">Primary action highlighted below.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+            {cards.map((card, index) => (
+              <DashboardCard
+                key={card.title}
+                title={card.title}
+                description={card.description}
                 href={card.href}
-                className="glow-pill mt-8 inline-flex w-fit rounded-lg px-5 py-2.5 text-sm font-medium text-[var(--foreground)] hover:opacity-90 xl:text-[0.95rem]"
-              >
-                {card.cta}
-              </Link>
-            </div>
-          ))}
-        </div>
+                cta={card.cta}
+                iconId={card.iconId}
+                buttonVariant={index === 0 ? "primary" : "secondary"}
+              />
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );

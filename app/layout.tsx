@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { SiteGuideAssistant } from "@/components/site-guide-assistant";
+import { SiteGuideAssistantRoot } from "@/components/site-guide-assistant-root";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 const themeInitScript = `(function(){try{var s=localStorage.getItem('chef-theme');var p=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=s==='dark'||(s!=='light'&&p);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 export const metadata: Metadata = {
-  title: "Chef — Recipe assistant",
+  title: "Chef, recipe assistant",
   description: "Search and explore recipes with an AI cooking assistant.",
 };
 
@@ -45,7 +45,7 @@ export default function RootLayout({
           {themeInitScript}
         </Script>
         {children}
-        <SiteGuideAssistant />
+        <SiteGuideAssistantRoot />
       </body>
     </html>
   );
