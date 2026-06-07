@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
+export const runtime = "nodejs";
+
 export async function PATCH(req: Request) {
   try {
     const anonymousKey = getAnonymousKeyFromRequest(req);

@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { ChefAvatar, UserAvatar } from "@/components/chef-avatar";
-import { tryParseRecipe } from "@/components/chat/parse-recipe";
-import { RecipeCard } from "@/components/chat/recipe-card";
+import { MarkdownMessage } from "@/components/chat/markdown-message";
+import { parseRecipeResponse } from "@/components/chat/parse-recipe";
+import { RecipeAccordion } from "@/components/chat/recipe-accordion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { sanitizeAssistantDisplayText } from "@/lib/sanitize-chat-display";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,7 @@ export function ChatMessage({ message, userInitials, assistantLabel = "Chef" }: 
 
   const parsed = useMemo(() => {
     if (isUser) return null;
-    return tryParseRecipe(message.text);
+    return parseRecipeResponse(message.text);
   }, [isUser, message.text]);
 
   const displayPlainText = useMemo(
@@ -54,6 +55,7 @@ export function ChatMessage({ message, userInitials, assistantLabel = "Chef" }: 
     [isUser, message.text]
   );
 
+  const showRecipeCards = parsed?.kind === "recipes" && parsed.recipes.length > 0;
   const wideBubble = Boolean(!isUser && parsed);
 
   return (
@@ -65,7 +67,7 @@ export function ChatMessage({ message, userInitials, assistantLabel = "Chef" }: 
       <div
         className={cn(
           "flex min-w-0 flex-1 flex-col",
-          wideBubble ? "max-w-[min(100%,42rem)]" : "max-w-[70%]",
+          wideBubble ? "max-w-[min(100%,50rem)]" : "max-w-[70%]",
           isUser ? "items-end" : "items-start"
         )}
       >
@@ -80,22 +82,25 @@ export function ChatMessage({ message, userInitials, assistantLabel = "Chef" }: 
             "w-full rounded-2xl px-4 py-3 shadow-sm transition-all duration-200 sm:px-5 sm:py-4",
             isUser
               ? "rounded-br-md bg-[var(--accent)] text-[var(--foreground)]"
-              : "rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--foreground)]"
+              : "rounded-bl-md border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--foreground)]",
+            wideBubble && "overflow-hidden"
           )}
         >
-          {!isUser && parsed ? (
-            <>
+          {showRecipeCards ? (
+            <div className="min-w-0 space-y-4">
               {parsed.intro ? (
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--foreground)]">
+                <p className="break-words text-[15px] leading-[1.65] text-[var(--foreground)]">
                   {sanitizeAssistantDisplayText(parsed.intro)}
                 </p>
               ) : null}
-              <RecipeCard recipe={parsed} />
-            </>
+              <RecipeAccordion recipes={parsed.recipes} />
+            </div>
+          ) : !isUser && parsed?.kind === "markdown" ? (
+            <MarkdownMessage content={parsed.content} />
           ) : (
             <div
               className={cn(
-                "whitespace-pre-wrap break-words text-sm leading-relaxed sm:leading-relaxed",
+                "whitespace-pre-wrap break-words text-[15px] leading-[1.65]",
                 isUser ? "text-[var(--foreground)]" : "text-[var(--muted-text)]"
               )}
             >

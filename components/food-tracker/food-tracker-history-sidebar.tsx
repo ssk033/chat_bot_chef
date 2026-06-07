@@ -2,6 +2,11 @@
 
 import { IconClock, IconPhoto, IconTrash } from "@tabler/icons-react";
 import type { FoodTrackerHistoryEntry } from "@/lib/food-tracker-history";
+import {
+  formatNutritionRange,
+  nutritionConfidenceLabel,
+  scaleFoodTrackerRanges,
+} from "@/lib/food-nutrition-display";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -79,6 +84,8 @@ export function FoodTrackerHistorySidebar({
           <ul className="space-y-2">
             {entries.map((entry) => {
               const active = entry.id === activeId;
+              const { portionSize, ...snapshot } = entry.result;
+              const scaled = scaleFoodTrackerRanges(snapshot, portionSize ?? "medium");
               return (
                 <li key={entry.id}>
                   <div
@@ -101,9 +108,10 @@ export function FoodTrackerHistorySidebar({
                         className="h-14 w-14 shrink-0 rounded-lg object-cover ring-1 ring-[var(--border-subtle)]"
                       />
                       <span className="min-w-0 flex-1 py-0.5">
-                        <span className="line-clamp-2 text-sm font-medium text-[var(--foreground)]">{entry.result.dish}</span>
+                        <span className="line-clamp-2 text-sm font-medium text-[var(--foreground)]">{scaled.dish}</span>
                         <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--muted-text)]">
-                          <span>{entry.result.calories} kcal</span>
+                          <span>{nutritionConfidenceLabel(scaled.nutritionConfidence)} nutrition</span>
+                          <span>{formatNutritionRange(scaled.calories, "kcal")}</span>
                           <span className="opacity-80">{formatTime(entry.createdAt)}</span>
                         </span>
                         <span className="mt-0.5 block truncate text-[11px] text-[var(--muted-text)] opacity-80" title={entry.filename}>

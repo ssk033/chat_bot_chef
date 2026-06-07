@@ -1,17 +1,12 @@
-/** Snapshot saved with history (matches API / page result shape). */
-export type FoodTrackerResultSnapshot = {
-  dish: string;
-  confidence: number;
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fats_g: number;
-  demoMode?: boolean;
-  backend?: "keras" | "foodx" | "clip";
-  demoLowConfidence?: boolean;
-  demoHint?: string;
-  suppressedGuess?: string;
-  clipLabelCount?: number;
+import {
+  migrateLegacyResultSnapshot,
+  type FoodTrackerNutritionResponse,
+  type PortionSize,
+} from "@/lib/food-nutrition-display";
+
+/** Snapshot saved with history (honest nutrition ranges). */
+export type FoodTrackerResultSnapshot = FoodTrackerNutritionResponse & {
+  portionSize?: PortionSize;
 };
 
 export type FoodTrackerHistoryEntry = {
@@ -32,24 +27,39 @@ export function loadFoodTrackerHistory(): FoodTrackerHistoryEntry[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isHistoryEntry);
+    return parsed.filter(isHistoryEntry).map(normalizeHistoryEntry);
   } catch {
     return [];
   }
 }
 
+function normalizeHistoryEntry(entry: FoodTrackerHistoryEntry): FoodTrackerHistoryEntry {
+  const migrated = migrateLegacyResultSnapshot(entry.result as unknown as Record<string, unknown>);
+  if (!migrated) return entry;
+  return {
+    ...entry,
+    result: {
+      ...migrated,
+      portionSize: entry.result.portionSize ?? "medium",
+    },
+  };
+}
+
 function isHistoryEntry(x: unknown): x is FoodTrackerHistoryEntry {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
-  return (
-    typeof o.id === "string" &&
-    typeof o.createdAt === "number" &&
-    typeof o.thumbDataUrl === "string" &&
-    typeof o.filename === "string" &&
-    o.result !== null &&
-    typeof o.result === "object" &&
-    typeof (o.result as FoodTrackerResultSnapshot).dish === "string"
-  );
+  if (
+    typeof o.id !== "string" ||
+    typeof o.createdAt !== "number" ||
+    typeof o.thumbDataUrl !== "string" ||
+    typeof o.filename !== "string" ||
+    !o.result ||
+    typeof o.result !== "object"
+  ) {
+    return false;
+  }
+  const r = o.result as Record<string, unknown>;
+  return typeof r.dish === "string";
 }
 
 export function persistFoodTrackerHistory(entries: FoodTrackerHistoryEntry[]): void {

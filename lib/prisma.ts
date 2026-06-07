@@ -54,6 +54,5 @@ export const withPrismaReconnect = async <T>(operation: () => Promise<T>): Promi
   }
 };
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// Reuse one client per serverless instance (dev + production).
+globalForPrisma.prisma = prisma;

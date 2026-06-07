@@ -12,6 +12,8 @@
     "lint": "eslint",
     "verify": "eslint --max-warnings 0 . && next build",
     "load": "npx tsx scripts/load.ts",
+    "import-recipes": "npx tsx scripts/import-recipes-json.ts",
+    "backfill-embeddings": "npx tsx scripts/backfill-embeddings.ts",
     "check-db": "npx tsx scripts/check-db.ts",
     "clear-db": "npx tsx scripts/clear-db.ts",
     "food-ai:dev": "node scripts/food-ai-dev.mjs",
@@ -32,7 +34,10 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-dropzone": "^15.0.0",
-    "tailwind-merge": "^3.4.0"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -43,8 +48,8 @@
     "baseline-browser-mapping": "^2.10.19",
     "concurrently": "^9.2.1",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.3",
-    "next": "^16.2.3",
+    "eslint-config-next": "^16.2.7",
+    "next": "^16.2.7",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

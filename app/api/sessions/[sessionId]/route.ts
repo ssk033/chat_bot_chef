@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
+export const runtime = "nodejs";
+
 async function loadSessionForUser(sessionId: number, anonymousKey: string) {
   const session = await withPrismaReconnect(() => prisma.chatSession.findFirst({
     where: { id: sessionId, user: { anonymousKey } },

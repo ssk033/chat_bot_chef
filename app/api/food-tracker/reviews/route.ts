@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma, withPrismaReconnect } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function clampStr(s: unknown, max: number): string {

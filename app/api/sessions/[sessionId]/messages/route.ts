@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma, withPrismaReconnect } from "@/lib/prisma";
 import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 
+export const runtime = "nodejs";
+
 function titleFromFirstUserMessage(text: string): string {
   const t = text.replace(/\s+/g, " ").trim();
   if (!t) return "New chat";

@@ -21,7 +21,16 @@ import {
   prependFoodTrackerHistory,
   removeFoodTrackerHistoryEntry,
   type FoodTrackerHistoryEntry,
+  type FoodTrackerResultSnapshot,
 } from "@/lib/food-tracker-history";
+import {
+  formatNutritionRange,
+  NUTRITION_DISCLAIMER,
+  nutritionConfidenceLabel,
+  scaleFoodTrackerRanges,
+  type FoodTrackerNutritionResponse,
+  type PortionSize,
+} from "@/lib/food-nutrition-display";
 
 function subscribeHtmlDark(cb: () => void) {
   if (typeof document === "undefined") return () => {};
@@ -35,21 +44,6 @@ function readHtmlIsDark(): boolean {
   return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 }
 
-type PredictResult = {
-  dish: string;
-  confidence: number;
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fats_g: number;
-  demoMode?: boolean;
-  backend?: "keras" | "foodx" | "clip";
-  demoLowConfidence?: boolean;
-  demoHint?: string;
-  suppressedGuess?: string;
-  clipLabelCount?: number;
-};
-
 export default function FoodTrackerPage() {
   const router = useRouter();
   const authorized = useSyncExternalStore(
@@ -61,7 +55,8 @@ export default function FoodTrackerPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PredictResult | null>(null);
+  const [baseResult, setBaseResult] = useState<FoodTrackerNutritionResponse | null>(null);
+  const [portionSize, setPortionSize] = useState<PortionSize>("medium");
 
   const [reviewRating, setReviewRating] = useState<number | null>(null);
   const [reviewCorrectedDish, setReviewCorrectedDish] = useState("");
@@ -93,7 +88,12 @@ export default function FoodTrackerPage() {
     setReviewThanks(false);
     setReviewError(null);
     setReviewModalOpen(false);
-  }, [result?.dish, result?.confidence, result?.demoLowConfidence, result?.backend]);
+  }, [baseResult?.dish, baseResult?.dishConfidence, baseResult?.demoLowConfidence, baseResult?.backend]);
+
+  const displayResult = useMemo(() => {
+    if (!baseResult) return null;
+    return scaleFoodTrackerRanges(baseResult, portionSize);
+  }, [baseResult, portionSize]);
 
   useEffect(() => {
     if (!file) {
@@ -111,7 +111,9 @@ export default function FoodTrackerPage() {
 
   const applyHistoryEntry = (entry: FoodTrackerHistoryEntry) => {
     setHistoryThumbUrl(entry.thumbDataUrl);
-    setResult(entry.result);
+    const { portionSize: savedPortion, ...snapshot } = entry.result;
+    setBaseResult(snapshot);
+    setPortionSize(savedPortion ?? "medium");
     setFile(null);
     setError(null);
     setActiveHistoryId(entry.id);
@@ -122,7 +124,7 @@ export default function FoodTrackerPage() {
     if (activeHistoryId === id) {
       setActiveHistoryId(null);
       setHistoryThumbUrl(null);
-      setResult(null);
+      setBaseResult(null);
     }
   };
 
@@ -130,19 +132,20 @@ export default function FoodTrackerPage() {
     setHistory(clearFoodTrackerHistory());
     setActiveHistoryId(null);
     setHistoryThumbUrl(null);
-    setResult(null);
+    setBaseResult(null);
   };
 
   const analyze = async () => {
     if (!file) return;
     setLoading(true);
     setError(null);
-    setResult(null);
+    setBaseResult(null);
+    setPortionSize("medium");
     const fd = new FormData();
     fd.append("image", file);
     try {
       const res = await fetch("/api/food-ai/predict", { method: "POST", body: fd });
-      const data = (await res.json()) as PredictResult & { error?: string; detail?: unknown; backend?: string };
+      const data = (await res.json()) as FoodTrackerNutritionResponse & { error?: string; detail?: unknown };
       if (!res.ok) {
         let msg = parseApiError(data, res.status);
         if (/no model file at/i.test(msg)) {
@@ -151,45 +154,17 @@ export default function FoodTrackerPage() {
         setError(msg);
         return;
       }
-      const backend =
-        data.backend === "foodx" || data.backend === "keras" || data.backend === "clip"
-          ? data.backend
-          : undefined;
-      const ext = data as {
-        demoLowConfidence?: boolean;
-        demoHint?: string;
-        suppressedGuess?: string;
-        clipLabelCount?: number;
-        backend?: string;
-      };
-      const bk =
-        ext.backend === "foodx" || ext.backend === "keras" || ext.backend === "clip"
-          ? ext.backend
-          : backend;
-      const nextResult: PredictResult = {
-        dish: data.dish,
-        confidence: data.confidence,
-        calories: data.calories,
-        protein_g: data.protein_g,
-        carbs_g: data.carbs_g,
-        fats_g: data.fats_g,
-        demoMode: Boolean((data as { demoMode?: boolean }).demoMode),
-        backend: bk,
-        demoLowConfidence: Boolean(ext.demoLowConfidence),
-        demoHint: typeof ext.demoHint === "string" ? ext.demoHint : undefined,
-        suppressedGuess: typeof ext.suppressedGuess === "string" ? ext.suppressedGuess : undefined,
-        clipLabelCount: typeof ext.clipLabelCount === "number" ? ext.clipLabelCount : undefined,
-      };
-      setResult(nextResult);
+      setBaseResult(data);
 
       void fileToThumbnailDataUrl(file)
         .then((thumb) => {
+          const snapshot: FoodTrackerResultSnapshot = { ...data, portionSize: "medium" };
           const entry: FoodTrackerHistoryEntry = {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
             thumbDataUrl: thumb,
             filename: file.name,
-            result: nextResult,
+            result: snapshot,
           };
           setHistory((prev) => prependFoodTrackerHistory(prev, entry));
           setActiveHistoryId(entry.id);
@@ -286,7 +261,8 @@ export default function FoodTrackerPage() {
                     setHistoryThumbUrl(null);
                     setActiveHistoryId(null);
                     setFile(f);
-                    setResult(null);
+                    setBaseResult(null);
+                    setPortionSize("medium");
                     setError(null);
                   }}
                 />
@@ -318,7 +294,7 @@ export default function FoodTrackerPage() {
             <h2 className="mb-4 text-lg font-medium text-[var(--foreground)]">Result</h2>
             {loading ? (
               <FoodTrackerResultSkeleton />
-            ) : !result ? (
+            ) : !displayResult ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 px-2 py-8 text-center">
                 <IconPhotoScan className="h-11 w-11 text-[var(--muted-text)] opacity-45" stroke={1.25} aria-hidden />
                 <h3 className="text-sm font-semibold text-[var(--foreground)]">No data yet</h3>
@@ -336,34 +312,48 @@ export default function FoodTrackerPage() {
               </div>
             ) : (
               <div className="flex flex-1 flex-col gap-4">
-                {result.demoLowConfidence ? (
+                {displayResult.demoLowConfidence ? (
                   <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--foreground)]">
                     <strong className="font-medium">Not sure.</strong> This photo did not match strongly enough. Try a clearer, well lit shot with
                     the food in the centre.
                   </p>
                 ) : null}
-                {result.demoMode && !result.demoLowConfidence ? (
+                {displayResult.demoMode && !displayResult.demoLowConfidence ? (
                   <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--accent)_08%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--muted-text)]">
                     Heads up: you are using a demo setup, so treat the dish name and nutrition as rough guides only.
                   </p>
                 ) : null}
+                {displayResult.nutritionUncertaintyNote ? (
+                  <p className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--foreground)_06%,var(--surface-muted))] p-3 text-sm leading-relaxed text-[var(--foreground)]">
+                    {displayResult.nutritionUncertaintyNote}
+                  </p>
+                ) : null}
                 <div className="space-y-2">
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-text)]">Dish</p>
-                  <p className="text-lg font-semibold text-[var(--foreground)]">{result.dish}</p>
-                  <ConfidenceMarker confidence={result.confidence} lowTrust={Boolean(result.demoLowConfidence)} />
+                  <p className="text-lg font-semibold text-[var(--foreground)]">{displayResult.dish}</p>
+                  <DishConfidenceMarker
+                    confidence={displayResult.dishConfidence}
+                    lowTrust={Boolean(displayResult.demoLowConfidence)}
+                  />
                 </div>
+                <div className="grid gap-3 text-sm sm:grid-cols-2">
+                  <MetaLabel label="Nutrition Confidence" value={nutritionConfidenceLabel(displayResult.nutritionConfidence)} />
+                  <MetaLabel label="Serving Basis" value={displayResult.servingBasis} />
+                  <MetaLabel label="Nutrition Source" value={displayResult.nutritionSource} className="sm:col-span-2" />
+                </div>
+                <PortionSizeSelector value={portionSize} onChange={setPortionSize} />
                 <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-4 shadow-sm transition-all duration-200 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] hover:shadow-md motion-safe:hover:scale-[1.01]">
                   <p className="text-xs font-medium text-[var(--muted-text)]">Calories</p>
-                  <p className="text-lg font-semibold tracking-tight text-[var(--foreground)]">{result.calories} kcal</p>
+                  <p className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
+                    {formatNutritionRange(displayResult.calories, "kcal")}
+                  </p>
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-sm">
-                  <MacroStat label="Protein" value={`${result.protein_g} g`} />
-                  <MacroStat label="Carbs" value={`${result.carbs_g} g`} />
-                  <MacroStat label="Fats" value={`${result.fats_g} g`} />
+                  <MacroStat label="Protein" value={formatNutritionRange(displayResult.protein_g, "g")} />
+                  <MacroStat label="Carbs" value={formatNutritionRange(displayResult.carbs_g, "g")} />
+                  <MacroStat label="Fat" value={formatNutritionRange(displayResult.fats_g, "g")} />
                 </div>
-                <p className="text-xs leading-relaxed text-[var(--muted-text)]">
-                  Nutrition is for a typical serving of that dish and is not measured from your exact portion.
-                </p>
+                <p className="text-xs leading-relaxed text-[var(--muted-text)]">{NUTRITION_DISCLAIMER}</p>
                 <Button
                   type="button"
                   variant="secondary"
@@ -381,7 +371,7 @@ export default function FoodTrackerPage() {
           </SurfaceCard>
         </div>
 
-        {reviewModalOpen && result ? (
+        {reviewModalOpen && baseResult ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
             <button
               type="button"
@@ -409,7 +399,7 @@ export default function FoodTrackerPage() {
               </p>
               <div className="space-y-4">
                 <p className="text-sm text-[var(--foreground)]">
-                  You were shown <span className="font-semibold">{result.dish}</span>.
+                  You were shown <span className="font-semibold">{baseResult.dish}</span>.
                 </p>
                 <div>
                   <p className="mb-2 text-sm font-medium text-[var(--foreground)]">How accurate was this? (required)</p>
@@ -477,7 +467,7 @@ export default function FoodTrackerPage() {
                   disabled={reviewRating === null || reviewSubmitting}
                   onClick={async () => {
                     const account = getStoredUser();
-                    if (!account?.email || !result || reviewRating === null) return;
+                    if (!account?.email || !baseResult || reviewRating === null) return;
                     setReviewSubmitting(true);
                     setReviewError(null);
                     try {
@@ -486,13 +476,13 @@ export default function FoodTrackerPage() {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           reviewerEmail: account.email,
-                          predictedDish: result.dish,
-                          predictedConfidence: result.confidence,
-                          backend: result.backend ?? undefined,
+                          predictedDish: baseResult.dish,
+                          predictedConfidence: baseResult.dishConfidence,
+                          backend: baseResult.backend ?? undefined,
                           rating: reviewRating,
                           correctedDish: reviewCorrectedDish.trim() || undefined,
                           comment: reviewComment.trim() || undefined,
-                          demoLowConfidence: Boolean(result.demoLowConfidence),
+                          demoLowConfidence: Boolean(baseResult.demoLowConfidence),
                         }),
                       });
                       const data = (await res.json()) as { error?: string };
@@ -608,14 +598,10 @@ function toneForConfidence(conf: number, lowTrust: boolean): ConfidenceTone {
   return "low";
 }
 
-function ConfidenceMarker({ confidence, lowTrust }: { confidence: number; lowTrust: boolean }) {
+function DishConfidenceMarker({ confidence, lowTrust }: { confidence: number; lowTrust: boolean }) {
   const pct = confidence * 100;
   const tone = toneForConfidence(confidence, lowTrust);
-  const label =
-    tone === "high" ? "High confidence" : tone === "mid" ? "Medium confidence" : "Low confidence";
-
   const toneText = tone === "low" ? "text-[var(--muted-text)]" : "text-[var(--foreground)]";
-
   const dot =
     tone === "high"
       ? "bg-[var(--accent)]"
@@ -624,14 +610,70 @@ function ConfidenceMarker({ confidence, lowTrust }: { confidence: number; lowTru
         : "bg-[var(--muted-text)]";
 
   return (
-    <span
-      role="status"
-      className={`mt-2 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-1 text-xs ${toneText}`}
-    >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
-      <span className="font-medium">{label}</span>
-      <span className="opacity-90">({pct.toFixed(0)}% sure)</span>
-    </span>
+    <div className="mt-2 space-y-1">
+      <p className="text-xs font-medium text-[var(--muted-text)]">Dish Recognition Confidence</p>
+      <span
+        role="status"
+        className={`inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-1 text-xs ${toneText}`}
+      >
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+        <span className="font-semibold">{pct.toFixed(0)}%</span>
+      </span>
+    </div>
+  );
+}
+
+function MetaLabel({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="text-xs font-medium text-[var(--muted-text)]">{label}</p>
+      <p className="text-sm font-medium text-[var(--foreground)]">{value}</p>
+    </div>
+  );
+}
+
+function PortionSizeSelector({
+  value,
+  onChange,
+}: {
+  value: PortionSize;
+  onChange: (size: PortionSize) => void;
+}) {
+  const options: { id: PortionSize; label: string }[] = [
+    { id: "small", label: "Small" },
+    { id: "medium", label: "Medium" },
+    { id: "large", label: "Large" },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-[var(--muted-text)]">Portion size</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+              value === opt.id
+                ? "border-[color-mix(in_srgb,var(--accent)_40%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent)_12%,var(--surface-muted))] text-[var(--foreground)]"
+                : "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted-text)] hover:text-[var(--foreground)]"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

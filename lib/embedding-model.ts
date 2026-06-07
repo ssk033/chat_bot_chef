@@ -19,9 +19,16 @@ const MODEL_DIR_CANDIDATES = [
   rootJoin('RecipeModel', 'models', 'recipe-embedder'),
 ];
 
+function hasModelWeights(dir: string): boolean {
+  return (
+    fs.existsSync(path.join(dir, "model.safetensors")) ||
+    fs.existsSync(path.join(dir, "pytorch_model.bin"))
+  );
+}
+
 function resolveModelDir(): string | null {
   for (const candidate of MODEL_DIR_CANDIDATES) {
-    if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(candidate) && hasModelWeights(candidate)) return candidate;
   }
   return null;
 }
@@ -36,7 +43,8 @@ const HUGGINGFACE_MODELS = [
 const EMBEDDING_CACHE_TTL_MS = 5 * 60 * 1000;
 const EMBEDDING_CACHE_MAX_ITEMS = 300;
 const HF_TIMEOUT_MS = 3500;
-const PYTHON_TIMEOUT_MS = 8000;
+/** First local inference loads ~90MB weights; cold start can exceed 8s on Windows. */
+const PYTHON_TIMEOUT_MS = 45_000;
 
 const embeddingCache = new Map<string, { value: number[]; expiresAt: number }>();
 const inFlightEmbeddings = new Map<string, Promise<number[]>>();

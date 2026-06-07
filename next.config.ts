@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
-    optimizePackageImports: ["@tabler/icons-react", "motion"],
+    optimizePackageImports: ["@tabler/icons-react", "motion", "react-markdown"],
   },
   images: {
     formats: ["image/avif", "image/webp"],

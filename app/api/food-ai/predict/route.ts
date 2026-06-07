@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildHonestNutritionResponse } from "@/lib/food-nutrition-display";
 import { estimateFoodWithGeminiVision } from "@/lib/gemini-food-vision";
 
 // Must match `FOOD_AI_PORT` in scripts/food-ai-dev.mjs (default 8788).
@@ -29,31 +30,8 @@ function extractCnnConfidence(parsed: Record<string, unknown>): number {
   return 0;
 }
 
-/** Strip fields that would reveal which backend answered (CNN vs Gemini). */
-function sanitizeForClient(body: Record<string, unknown>): Record<string, unknown> {
-  const out = { ...body };
-  delete out.predictionSource;
-  delete out.predictionNote;
-  delete out.cnnConfidence;
-  delete out.cnnDish;
-  return out;
-}
-
-function jsonFromGemini(
-  gemini: NonNullable<Awaited<ReturnType<typeof estimateFoodWithGeminiVision>>>,
-  cnnMeta?: Record<string, unknown>,
-) {
-  return sanitizeForClient({
-    dish: gemini.dish,
-    confidence: gemini.confidence,
-    calories: gemini.calories,
-    protein_g: gemini.protein_g,
-    carbs_g: gemini.carbs_g,
-    fats_g: gemini.fats_g,
-    demoMode: typeof cnnMeta?.demoMode === "boolean" ? cnnMeta.demoMode : false,
-    demoLowConfidence: false,
-    demoHint: typeof cnnMeta?.demoHint === "string" ? cnnMeta.demoHint : undefined,
-  });
+function respondHonest(parsed: Record<string, unknown>, fromGemini = false) {
+  return NextResponse.json(buildHonestNutritionResponse(parsed, { fromGemini }));
 }
 
 export async function POST(request: Request) {
@@ -83,7 +61,17 @@ export async function POST(request: Request) {
       mimeType,
     });
     if (geminiOnly) {
-      return NextResponse.json(jsonFromGemini(geminiOnly));
+      return respondHonest(
+        {
+          dish: geminiOnly.dish,
+          confidence: geminiOnly.confidence,
+          calories: geminiOnly.calories,
+          protein_g: geminiOnly.protein_g,
+          carbs_g: geminiOnly.carbs_g,
+          fats_g: geminiOnly.fats_g,
+        },
+        true
+      );
     }
     return NextResponse.json(
       {
@@ -102,7 +90,17 @@ export async function POST(request: Request) {
       mimeType,
     });
     if (geminiOnly) {
-      return NextResponse.json(jsonFromGemini(geminiOnly));
+      return respondHonest(
+        {
+          dish: geminiOnly.dish,
+          confidence: geminiOnly.confidence,
+          calories: geminiOnly.calories,
+          protein_g: geminiOnly.protein_g,
+          carbs_g: geminiOnly.carbs_g,
+          fats_g: geminiOnly.fats_g,
+        },
+        true
+      );
     }
     return new NextResponse(text, {
       status: res.status,
@@ -116,7 +114,17 @@ export async function POST(request: Request) {
       mimeType,
     });
     if (geminiOnly) {
-      return NextResponse.json(jsonFromGemini(geminiOnly));
+      return respondHonest(
+        {
+          dish: geminiOnly.dish,
+          confidence: geminiOnly.confidence,
+          calories: geminiOnly.calories,
+          protein_g: geminiOnly.protein_g,
+          carbs_g: geminiOnly.carbs_g,
+          fats_g: geminiOnly.fats_g,
+        },
+        true
+      );
     }
     return NextResponse.json(parsed, { status: res.status });
   }
@@ -125,12 +133,7 @@ export async function POST(request: Request) {
   const useGemini = conf < CNN_CONFIDENCE_THRESHOLD;
 
   if (!useGemini) {
-    return NextResponse.json(
-      sanitizeForClient({
-        ...parsed,
-        confidence: conf,
-      }),
-    );
+    return respondHonest({ ...parsed, confidence: conf }, false);
   }
 
   const gemini = await estimateFoodWithGeminiVision({
@@ -141,13 +144,19 @@ export async function POST(request: Request) {
   });
 
   if (!gemini) {
-    return NextResponse.json(
-      sanitizeForClient({
-        ...parsed,
-        confidence: conf,
-      }),
-    );
+    return respondHonest({ ...parsed, confidence: conf }, false);
   }
 
-  return NextResponse.json(jsonFromGemini(gemini, parsed));
+  return respondHonest(
+    {
+      ...parsed,
+      dish: gemini.dish,
+      confidence: gemini.confidence,
+      calories: gemini.calories,
+      protein_g: gemini.protein_g,
+      carbs_g: gemini.carbs_g,
+      fats_g: gemini.fats_g,
+    },
+    true
+  );
 }
