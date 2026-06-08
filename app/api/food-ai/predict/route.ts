@@ -62,7 +62,11 @@ type CnnOutcome =
 
 async function callCnn(imageBuffer: Buffer, mimeType: string): Promise<CnnOutcome> {
   const upstream = new FormData();
-  upstream.append("image", new Blob([imageBuffer], { type: mimeType }), "upload.jpg");
+  upstream.append(
+    "image",
+    new Blob([new Uint8Array(imageBuffer)], { type: mimeType }),
+    "upload.jpg"
+  );
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CNN_TIMEOUT_MS);
