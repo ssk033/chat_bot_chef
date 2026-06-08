@@ -55,13 +55,15 @@ function geminiModelCandidates(): string[] {
   const env = process.env.GEMINI_MODEL?.trim();
   const list = [
     env,
-    "gemini-2.5-flash",
-    "gemini-flash-latest",
-    "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash",
   ].filter((m): m is string => Boolean(m));
   return [...new Set(list)];
 }
+
+const GEMINI_VISION_TIMEOUT_MS = Number(process.env.FOOD_AI_GEMINI_TIMEOUT_MS) || 18_000;
 
 function parseFoodEstimate(obj: Record<string, unknown>): GeminiFoodEstimate | null {
   const dish = String(obj.dish ?? "").trim();
@@ -88,7 +90,7 @@ function parseFoodEstimate(obj: Record<string, unknown>): GeminiFoodEstimate | n
  * Ask Gemini to identify the dish and estimate macros from the meal photo.
  * Tries multiple model IDs when the configured model fails (quota, region, etc.).
  */
-export async function estimateFoodWithGeminiVision(args: {
+async function estimateFoodWithGeminiVisionInner(args: {
   imageBuffer: Buffer;
   mimeType: string;
   cnnDish?: string;
@@ -110,6 +112,8 @@ export async function estimateFoodWithGeminiVision(args: {
 "calories" (integer, kcal for one typical restaurant/home portion of what is visible),
 "protein_g", "carbs_g", "fats_g" (numbers, grams for that same portion),
 "confidence" (number from 0 to 1 for how sure you are of dish identity).
+
+Important: estimate macros for the full visible plate/bowl — not per 100g. For Indian rice dishes with meat (e.g. chicken biryani, mutton biryani), a typical plate (~300–350g) is often ~450–550 kcal with ~25–35g protein. Do not under-estimate protein for meat-based dishes.
 
 If multiple dishes appear, pick the dominant/main portion. Round calories/macros to sensible integers.`;
 
@@ -136,4 +140,23 @@ If multiple dishes appear, pick the dominant/main portion. Round calories/macros
   }
 
   return null;
+}
+
+export async function estimateFoodWithGeminiVision(args: {
+  imageBuffer: Buffer;
+  mimeType: string;
+  cnnDish?: string;
+  cnnConfidence?: number;
+}): Promise<GeminiFoodEstimate | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      estimateFoodWithGeminiVisionInner(args),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), GEMINI_VISION_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

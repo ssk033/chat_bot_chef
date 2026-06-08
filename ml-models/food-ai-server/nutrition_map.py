@@ -13,7 +13,7 @@ class Nutrition(TypedDict):
 # Calories aligned with train_indian_food_mobilenet notebook; macros are ballpark estimates per typical serving.
 NUTRITION_BY_DISH: dict[str, Nutrition] = {
     "AlooParatha": {"calories": 177, "protein_g": 5, "carbs_g": 24, "fats_g": 7},
-    "Biryani": {"calories": 290, "protein_g": 12, "carbs_g": 38, "fats_g": 10},
+    "Biryani": {"calories": 520, "protein_g": 30, "carbs_g": 58, "fats_g": 18},
     "ButterChicken": {"calories": 570, "protein_g": 35, "carbs_g": 18, "fats_g": 38},
     "CholeBhature": {"calories": 450, "protein_g": 14, "carbs_g": 55, "fats_g": 18},
     "DalMakhani": {"calories": 278, "protein_g": 11, "carbs_g": 28, "fats_g": 14},

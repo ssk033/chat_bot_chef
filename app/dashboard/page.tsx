@@ -35,7 +35,7 @@ type CardConfig = {
 const cards: CardConfig[] = [
   {
     title: "Create Meal Plan",
-    description: "Start from ingredients and goals to generate a fresh weekly plan you can edit anytime.",
+    description: "Start from ingredients and goals to create your own fresh weekly plan you can edit anytime.",
     href: "/meal-plan/create",
     cta: "Start Planning",
     iconId: "meal",

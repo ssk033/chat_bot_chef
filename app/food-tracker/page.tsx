@@ -31,6 +31,7 @@ import {
   type FoodTrackerNutritionResponse,
   type PortionSize,
 } from "@/lib/food-nutrition-display";
+import { resizeImageFileForUpload } from "@/lib/resize-food-upload";
 
 function subscribeHtmlDark(cb: () => void) {
   if (typeof document === "undefined") return () => {};
@@ -141,8 +142,9 @@ export default function FoodTrackerPage() {
     setError(null);
     setBaseResult(null);
     setPortionSize("medium");
+    const uploadFile = await resizeImageFileForUpload(file);
     const fd = new FormData();
-    fd.append("image", file);
+    fd.append("image", uploadFile);
     try {
       const res = await fetch("/api/food-ai/predict", { method: "POST", body: fd });
       const data = (await res.json()) as FoodTrackerNutritionResponse & { error?: string; detail?: unknown };

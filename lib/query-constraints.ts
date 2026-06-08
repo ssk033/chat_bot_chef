@@ -110,6 +110,39 @@ const INGREDIENT_STOPWORDS = new Set([
   "anything",
 ]);
 
+/** Words that often follow an ingredient ("chicken breast") but are not ingredients themselves. */
+const INGREDIENT_MODIFIER_WORDS = new Set([
+  "breast",
+  "breasts",
+  "thigh",
+  "thighs",
+  "fillet",
+  "fillets",
+  "wing",
+  "wings",
+  "boneless",
+  "skinless",
+  "ground",
+  "minced",
+  "diced",
+  "chopped",
+  "sliced",
+  "fresh",
+  "frozen",
+  "canned",
+  "raw",
+  "cooked",
+  "large",
+  "small",
+  "medium",
+  "whole",
+  "lean",
+  "extra",
+  "organic",
+  "bone",
+  "bones",
+]);
+
 const CUISINE_WORDS = new Set([
   "indian",
   "italian",
@@ -248,13 +281,20 @@ function extractDietary(message: string): string[] {
 
 function extractExcludedIngredients(message: string): string[] {
   const excluded: string[] = [];
+  const allergiesMatch = message.match(/allergies\s*\([^)]*\)\s*:\s*([^\n.]+)/i);
+  if (allergiesMatch?.[1]) {
+    const value = allergiesMatch[1].trim().toLowerCase();
+    if (value && value !== "none" && value !== "n/a" && value !== "not specified") {
+      excluded.push(...ingredientsFromListText(allergiesMatch[1]));
+    }
+  }
+
   const patterns = message.matchAll(/\b(?:no|without|avoid)\s+([a-z][a-z\s-]{1,30})/gi);
   for (const match of patterns) {
     const chunk = match[1].split(/\s+and\s+|\s*,\s*/)[0]?.trim();
-    if (chunk) {
-      const resolved = resolveIngredientToken(chunk);
-      if (resolved) excluded.push(resolved);
-    }
+    if (!chunk || /^(none|n\/a|not specified)$/i.test(chunk)) continue;
+    const resolved = resolveIngredientToken(chunk);
+    if (resolved) excluded.push(resolved);
   }
   return [...new Set(excluded)];
 }
@@ -266,11 +306,85 @@ function isKnownIngredientToken(token: string): boolean {
   );
 }
 
+/** Meal planner chat sends a multi-line prompt; pantry lives on one labeled line. */
+const STRUCTURED_PANTRY_PATTERNS = [
+  /ingredients\s*\/?\s*pantry\s*on\s*hand\s*:\s*([^\n.]+)/i,
+  /generate a meal plan with ingredients:\s*([^.\n]+)/i,
+  /pantry\s*(?:on hand)?\s*:\s*([^\n.]+)/i,
+] as const;
+
+const MAX_INLINE_INGREDIENT_QUERY_LEN = 160;
+
+function isMealPlanStructuredPrompt(message: string): boolean {
+  return (
+    /plan\s+title\s*:/i.test(message) &&
+    /ingredients\s*\/?\s*pantry\s*on\s*hand\s*:/i.test(message)
+  );
+}
+
+function pushResolvedIngredient(ingredients: string[], raw: string): void {
+  if (
+    INGREDIENT_STOPWORDS.has(raw) ||
+    INGREDIENT_MODIFIER_WORDS.has(raw) ||
+    DIETARY_KEYWORDS.has(raw) ||
+    CUISINE_WORDS.has(raw)
+  ) {
+    return;
+  }
+  const resolved = resolveIngredientToken(raw);
+  if (!resolved || DIETARY_KEYWORDS.has(resolved) || CUISINE_WORDS.has(resolved)) {
+    return;
+  }
+  if (INGREDIENT_STOPWORDS.has(resolved)) return;
+  if (!isKnownIngredientToken(raw) && !isKnownIngredientToken(resolved)) return;
+  ingredients.push(normalizeIngredientKey(resolved));
+}
+
+/** Parse "oats, chicken breast, spinach" — comma segments, not every word in a paragraph. */
+function ingredientsFromListText(text: string): string[] {
+  const ingredients: string[] = [];
+  const segments = text.split(/[,/&]|\band\b/i);
+
+  for (const segment of segments) {
+    const trimmed = segment.trim();
+    if (!trimmed) continue;
+    for (const raw of tokenizeIngredientPhrase(trimmed)) {
+      pushResolvedIngredient(ingredients, raw);
+    }
+  }
+
+  return [...new Set(ingredients)];
+}
+
+function extractStructuredPantryIngredients(message: string): string[] {
+  for (const pattern of STRUCTURED_PANTRY_PATTERNS) {
+    const match = message.match(pattern);
+    if (match?.[1]?.trim()) {
+      return ingredientsFromListText(match[1]);
+    }
+  }
+  return [];
+}
+
 function extractRequiredIngredients(message: string): string[] {
+  const structuredPantry = extractStructuredPantryIngredients(message);
+  if (structuredPantry.length > 0) {
+    return structuredPantry;
+  }
+
+  if (isMealPlanStructuredPrompt(message)) {
+    return [];
+  }
+
   const hasListDelimiter = /[,/&]|\band\b/i.test(message);
-  let tokens = tokenizeIngredientPhrase(message);
+  const compact = !message.includes("\n") && message.trim().length <= MAX_INLINE_INGREDIENT_QUERY_LEN;
+
+  if (hasListDelimiter && compact) {
+    return ingredientsFromListText(message);
+  }
 
   if (!hasListDelimiter) {
+    const tokens = tokenizeIngredientPhrase(message);
     const meaningful = tokens.filter(
       (t) =>
         t.length > 1 &&
@@ -281,29 +395,14 @@ function extractRequiredIngredients(message: string): string[] {
     const hintMatches = meaningful.filter((t) => isKnownIngredientToken(t));
 
     if (hintMatches.length >= 2) {
-      tokens = hintMatches;
-    } else if (hintMatches.length === 1 && meaningful.length === 1) {
-      // Single-ingredient queries: "spinach", "chicken", "rice"
-      tokens = hintMatches;
-    } else {
-      return [];
+      return [...new Set(hintMatches.map((t) => normalizeIngredientKey(resolveIngredientToken(t))))];
+    }
+    if (hintMatches.length === 1 && meaningful.length === 1) {
+      return [normalizeIngredientKey(resolveIngredientToken(hintMatches[0]))];
     }
   }
 
-  const ingredients: string[] = [];
-  for (const raw of tokens) {
-    if (INGREDIENT_STOPWORDS.has(raw) || DIETARY_KEYWORDS.has(raw) || CUISINE_WORDS.has(raw)) {
-      continue;
-    }
-    const resolved = resolveIngredientToken(raw);
-    if (!resolved || DIETARY_KEYWORDS.has(resolved) || CUISINE_WORDS.has(resolved)) {
-      continue;
-    }
-    if (INGREDIENT_STOPWORDS.has(resolved)) continue;
-    ingredients.push(normalizeIngredientKey(resolved));
-  }
-
-  return [...new Set(ingredients)];
+  return [];
 }
 
 export function parseQueryConstraints(message: string): QueryConstraints {

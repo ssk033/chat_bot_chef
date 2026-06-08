@@ -61,10 +61,45 @@ def load_foodx_table() -> tuple[tuple[str, ...], tuple[str, ...], tuple[int, ...
     return tuple(names), tuple(display), tuple(kcals)
 
 
-def estimate_macros_from_calories(calories: int) -> tuple[int, int, int]:
+def estimate_macros_from_calories(calories: int, *, protein_ratio: float = 0.15) -> tuple[int, int, int]:
     """Rough P/C/F grams for 100g reference (CSV is per 100g); not from pixels."""
     c = max(calories, 1)
-    p = max(1, round((c * 0.15) / 4))
+    p = max(1, round((c * protein_ratio) / 4))
     carb = max(1, round((c * 0.50) / 4))
-    fat = max(1, round((c * 0.35) / 9))
+    fat = max(1, round((c * (1.0 - protein_ratio - 0.50)) / 9))
     return p, carb, fat
+
+
+def typical_serving_grams(display_name: str) -> int:
+    """Scale FoodX per-100g calories to a plausible plate size."""
+    low = display_name.lower()
+    if "biryani" in low or "pulao" in low or "pilaf" in low:
+        return 320
+    if "curry" in low or "stew" in low:
+        return 280
+    if "soup" in low or "salad" in low:
+        return 250
+    return 200
+
+
+def nutrition_for_foodx_label(display_name: str, cal_per_100g: int) -> tuple[int, int, int, int]:
+    """Return calories + macros for a typical serving of a FoodX-labelled dish."""
+    from nutrition_reference import reference_nutrition_for_label, reconcile_with_reference
+
+    ref = reference_nutrition_for_label(display_name)
+    if ref:
+        return ref["calories"], ref["protein_g"], ref["carbs_g"], ref["fats_g"]
+
+    grams = typical_serving_grams(display_name)
+    factor = grams / 100.0
+    cal = max(1, round(cal_per_100g * factor))
+    protein_ratio = 0.22 if any(k in display_name.lower() for k in ("chicken", "mutton", "lamb", "beef", "meat", "fish")) else 0.15
+    p, carb, fat = estimate_macros_from_calories(cal_per_100g, protein_ratio=protein_ratio)
+    scaled = {
+        "calories": cal,
+        "protein_g": max(1, round(p * factor)),
+        "carbs_g": max(1, round(carb * factor)),
+        "fats_g": max(1, round(fat * factor)),
+    }
+    final, _ = reconcile_with_reference(display_name, scaled)
+    return final["calories"], final["protein_g"], final["carbs_g"], final["fats_g"]

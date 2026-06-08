@@ -5,8 +5,10 @@ import { estimateFoodWithGeminiVision } from "@/lib/gemini-food-vision";
 // Must match `FOOD_AI_PORT` in scripts/food-ai-dev.mjs (default 8788).
 const UPSTREAM = process.env.FOOD_AI_SERVICE_URL ?? "http://127.0.0.1:8788";
 
-/** When CNN softmax/confidence is strictly below this (0–1), run Gemini Vision on the same image. */
+/** When CNN softmax/confidence is strictly below this (0–1), prefer Gemini Vision. */
 const CNN_CONFIDENCE_THRESHOLD = 0.65;
+
+const CNN_TIMEOUT_MS = Number(process.env.FOOD_AI_CNN_TIMEOUT_MS) || 10_000;
 
 export const runtime = "nodejs";
 
@@ -34,6 +36,69 @@ function respondHonest(parsed: Record<string, unknown>, fromGemini = false) {
   return NextResponse.json(buildHonestNutritionResponse(parsed, { fromGemini }));
 }
 
+function geminiToPayload(gemini: {
+  dish: string;
+  confidence: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fats_g: number;
+}) {
+  return {
+    dish: gemini.dish,
+    confidence: gemini.confidence,
+    calories: gemini.calories,
+    protein_g: gemini.protein_g,
+    carbs_g: gemini.carbs_g,
+    fats_g: gemini.fats_g,
+  };
+}
+
+type CnnOutcome =
+  | { kind: "ok"; parsed: Record<string, unknown>; conf: number }
+  | { kind: "error"; status: number; parsed: Record<string, unknown>; conf: number }
+  | { kind: "unreachable" }
+  | { kind: "invalid_json"; status: number; raw: string };
+
+async function callCnn(imageBuffer: Buffer, mimeType: string): Promise<CnnOutcome> {
+  const upstream = new FormData();
+  upstream.append("image", new Blob([imageBuffer], { type: mimeType }), "upload.jpg");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CNN_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${UPSTREAM}/predict`, {
+      method: "POST",
+      body: upstream,
+      signal: controller.signal,
+    });
+    const text = await res.text();
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return { kind: "invalid_json", status: res.status, raw: text };
+    }
+
+    const conf = extractCnnConfidence(parsed);
+    if (!res.ok) {
+      return { kind: "error", status: res.status, parsed, conf };
+    }
+    return { kind: "ok", parsed, conf };
+  } catch {
+    return { kind: "unreachable" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parallelGeminiEnabled(): boolean {
+  if (!process.env.GEMINI_API_KEY?.trim()) return false;
+  return process.env.FOOD_AI_PARALLEL_GEMINI !== "false";
+}
+
 export async function POST(request: Request) {
   const form = await request.formData();
   const file = form.get("image");
@@ -44,119 +109,63 @@ export async function POST(request: Request) {
   const mimeType = file.type || "image/jpeg";
   const imageBuffer = Buffer.from(await file.arrayBuffer());
 
-  const upstream = new FormData();
-  upstream.append("image", new Blob([imageBuffer], { type: mimeType }), "upload.jpg");
+  const geminiPromise = parallelGeminiEnabled()
+    ? estimateFoodWithGeminiVision({ imageBuffer, mimeType })
+    : null;
 
-  let text: string;
-  let res: Response;
-  try {
-    res = await fetch(`${UPSTREAM}/predict`, {
-      method: "POST",
-      body: upstream,
-    });
-    text = await res.text();
-  } catch {
-    const geminiOnly = await estimateFoodWithGeminiVision({
-      imageBuffer,
-      mimeType,
-    });
-    if (geminiOnly) {
-      return respondHonest(
-        {
-          dish: geminiOnly.dish,
-          confidence: geminiOnly.confidence,
-          calories: geminiOnly.calories,
-          protein_g: geminiOnly.protein_g,
-          carbs_g: geminiOnly.carbs_g,
-          fats_g: geminiOnly.fats_g,
-        },
-        true
-      );
-    }
-    return NextResponse.json(
-      {
-        error: `Cannot reach Food AI service at ${UPSTREAM}. Set GEMINI_API_KEY for Gemini vision fallback, or run npm run food-ai:dev (see ml-models/food-ai-server/requirements.txt).`,
-      },
-      { status: 503 },
-    );
+  const cnn = await callCnn(imageBuffer, mimeType);
+
+  if (cnn.kind === "ok" && cnn.conf >= CNN_CONFIDENCE_THRESHOLD) {
+    return respondHonest({ ...cnn.parsed, confidence: cnn.conf }, false);
   }
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    const geminiOnly = await estimateFoodWithGeminiVision({
+  const awaitGemini = async (cnnDish?: string, cnnConfidence?: number) => {
+    if (geminiPromise) {
+      return geminiPromise;
+    }
+    return estimateFoodWithGeminiVision({
       imageBuffer,
       mimeType,
+      cnnDish,
+      cnnConfidence,
     });
-    if (geminiOnly) {
-      return respondHonest(
-        {
-          dish: geminiOnly.dish,
-          confidence: geminiOnly.confidence,
-          calories: geminiOnly.calories,
-          protein_g: geminiOnly.protein_g,
-          carbs_g: geminiOnly.carbs_g,
-          fats_g: geminiOnly.fats_g,
-        },
-        true
-      );
+  };
+
+  if (cnn.kind === "ok") {
+    const gemini = await awaitGemini(
+      typeof cnn.parsed.dish === "string" ? cnn.parsed.dish : undefined,
+      cnn.conf,
+    );
+    if (gemini) {
+      return respondHonest({ ...cnn.parsed, ...geminiToPayload(gemini) }, true);
     }
-    return new NextResponse(text, {
-      status: res.status,
+    return respondHonest({ ...cnn.parsed, confidence: cnn.conf }, false);
+  }
+
+  if (cnn.kind === "error") {
+    const gemini = await awaitGemini();
+    if (gemini) {
+      return respondHonest(geminiToPayload(gemini), true);
+    }
+    return NextResponse.json(cnn.parsed, { status: cnn.status });
+  }
+
+  const gemini = await awaitGemini();
+  if (gemini) {
+    return respondHonest(geminiToPayload(gemini), true);
+  }
+
+  if (cnn.kind === "invalid_json") {
+    return new NextResponse(cnn.raw, {
+      status: cnn.status,
       headers: { "Content-Type": "application/json" },
     });
   }
 
-  if (!res.ok) {
-    const geminiOnly = await estimateFoodWithGeminiVision({
-      imageBuffer,
-      mimeType,
-    });
-    if (geminiOnly) {
-      return respondHonest(
-        {
-          dish: geminiOnly.dish,
-          confidence: geminiOnly.confidence,
-          calories: geminiOnly.calories,
-          protein_g: geminiOnly.protein_g,
-          carbs_g: geminiOnly.carbs_g,
-          fats_g: geminiOnly.fats_g,
-        },
-        true
-      );
-    }
-    return NextResponse.json(parsed, { status: res.status });
-  }
-
-  const conf = extractCnnConfidence(parsed);
-  const useGemini = conf < CNN_CONFIDENCE_THRESHOLD;
-
-  if (!useGemini) {
-    return respondHonest({ ...parsed, confidence: conf }, false);
-  }
-
-  const gemini = await estimateFoodWithGeminiVision({
-    imageBuffer,
-    mimeType,
-    cnnDish: typeof parsed.dish === "string" ? parsed.dish : undefined,
-    cnnConfidence: conf,
-  });
-
-  if (!gemini) {
-    return respondHonest({ ...parsed, confidence: conf }, false);
-  }
-
-  return respondHonest(
+  return NextResponse.json(
     {
-      ...parsed,
-      dish: gemini.dish,
-      confidence: gemini.confidence,
-      calories: gemini.calories,
-      protein_g: gemini.protein_g,
-      carbs_g: gemini.carbs_g,
-      fats_g: gemini.fats_g,
+      error: `Cannot reach Food AI service at ${UPSTREAM}. Set GEMINI_API_KEY for Gemini vision fallback, or run npm run food-ai:dev (see ml-models/food-ai-server/requirements.txt).`,
     },
-    true
+    { status: 503 },
   );
 }

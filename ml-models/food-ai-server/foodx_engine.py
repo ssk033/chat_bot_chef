@@ -11,7 +11,7 @@ from typing import Any, Literal
 import numpy as np
 from PIL import Image
 
-from foodx_data import estimate_macros_from_calories, load_foodx_table
+from foodx_data import load_foodx_table, nutrition_for_foodx_label
 
 _LOG = logging.getLogger("food_ai")
 
@@ -161,8 +161,8 @@ def predict_foodx(pil: Image.Image) -> dict[str, Any]:
 
     confidence = float(probs_np[idx])
     dish = display_names[idx]
-    cal = kcals[idx]
-    p_g, c_g, f_g = estimate_macros_from_calories(cal)
+    cal_100 = kcals[idx]
+    cal, p_g, c_g, f_g = nutrition_for_foodx_label(dish, cal_100)
 
     top_idx = np.argsort(probs_np)[-10:][::-1]
     top_probs = {display_names[i]: round(float(probs_np[i]), 4) for i in top_idx if i < n}
@@ -197,6 +197,7 @@ def predict_foodx(pil: Image.Image) -> dict[str, Any]:
         "protein_g": p_g,
         "carbs_g": c_g,
         "fats_g": f_g,
+        "servingBasis": "typical_plate",
         "demoMode": demo_vit,
         "backend": "foodx",
         "probabilities": top_probs,

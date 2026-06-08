@@ -129,7 +129,7 @@ def run_clip_indian16(pil: Image.Image) -> tuple[str, float, dict[str, float]]:
 
 def run_clip_foodx251(pil: Image.Image) -> tuple[str, float, dict[str, float], tuple[int, ...]]:
     """251 FoodX display names + per‑100 g calories from project CSV."""
-    from foodx_data import estimate_macros_from_calories
+    from foodx_data import nutrition_for_foodx_label
 
     tab = _cached_foodx_table()
     assert tab is not None
@@ -143,12 +143,12 @@ def run_clip_foodx251(pil: Image.Image) -> tuple[str, float, dict[str, float], t
     dish = display_names[idx]
     confidence = float(probs_np[idx])
     cal_100 = kcals[idx]
-    p_g, c_g, f_g = estimate_macros_from_calories(cal_100)
+    cal, p_g, c_g, f_g = nutrition_for_foodx_label(dish, cal_100)
 
     top_n = np.argsort(probs_np)[-15:][::-1]
     prob_map = {display_names[int(i)]: round(float(probs_np[int(i)]), 4) for i in top_n if int(i) < len(display_names)}
 
-    extras = cal_100, p_g, c_g, f_g
+    extras = cal, p_g, c_g, f_g
     # Return macros via side channel to avoid breaking tuple unpacking at call sites
     return dish, confidence, prob_map, extras
 

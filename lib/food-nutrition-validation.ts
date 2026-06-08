@@ -21,6 +21,15 @@ const DISH_RULES: Array<{
   }>;
 }> = [
   {
+    match: /\bbiryani\b/i,
+    checks: [
+      {
+        test: (v) => v.protein_g < 18,
+        reason: "Protein unusually low for biryani (typical chicken/mutton plate is higher).",
+      },
+    ],
+  },
+  {
     match: /\bpoha\b/i,
     checks: [
       {

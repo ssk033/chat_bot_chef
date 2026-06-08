@@ -1,3 +1,4 @@
+import { reconcileNutritionWithReference } from "@/lib/food-nutrition-reference";
 import { validateNutritionEstimate } from "@/lib/food-nutrition-validation";
 
 export type NutritionRange = { min: number; max: number };
@@ -8,7 +9,8 @@ export type NutritionSourceLabel =
   | "Dataset Average"
   | "Nutrition Lookup"
   | "Reference Serving"
-  | "Typical Serving Estimate";
+  | "Typical Serving Estimate"
+  | "Corrected Serving Estimate";
 
 export type PortionSize = "small" | "medium" | "large";
 
@@ -157,10 +159,14 @@ export function buildHonestNutritionResponse(
   const dish = String(parsed.dish ?? "Unknown").trim() || "Unknown";
   const dishConfidence = extractDishConfidence(parsed);
   const demoLowConfidence = Boolean(parsed.demoLowConfidence);
-  const macros = extractPointMacros(parsed);
+  const macrosRaw = extractPointMacros(parsed);
+  const { macros, corrected } = reconcileNutritionWithReference(dish, macrosRaw);
   const noNutrition = demoLowConfidence || macros.calories <= 0;
 
-  const nutritionSource = inferNutritionSource(parsed, fromGemini);
+  let nutritionSource = inferNutritionSource(parsed, fromGemini);
+  if (corrected) {
+    nutritionSource = "Corrected Serving Estimate";
+  }
   const servingBasis = "Typical Serving";
 
   if (noNutrition) {
