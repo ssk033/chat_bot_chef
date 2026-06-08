@@ -477,10 +477,24 @@ export default function ChatBotChefPage() {
     lastRequestTime.current = now;
 
     try {
+      const recentHistory = [...messages, userMsg]
+        .slice(-10)
+        .map((m) => ({
+          role: m.role === "user" ? "user" : "bot",
+          content: m.text,
+        }));
+
       const res = await fetch("/api/query", {
         method: "POST",
-        body: JSON.stringify({ message: userInput }),
-        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userInput,
+          sessionId: activeSessionId ?? undefined,
+          chatHistory: recentHistory,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(anonymousKey ? { [CHEF_ANONYMOUS_KEY_HEADER]: anonymousKey } : {}),
+        },
       });
 
       const data = await res.json();

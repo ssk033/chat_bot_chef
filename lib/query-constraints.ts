@@ -210,6 +210,35 @@ export const COMMON_INGREDIENT_HINTS = [
   "dal",
   "chickpea",
   "rajma",
+  "strawberry",
+  "strawberries",
+  "blueberry",
+  "blueberries",
+  "raspberry",
+  "raspberries",
+  "blackberry",
+  "blackberries",
+  "cranberry",
+  "cranberries",
+  "cherry",
+  "cherries",
+  "rhubarb",
+  "apple",
+  "banana",
+  "mango",
+  "peach",
+  "pear",
+  "orange",
+  "grape",
+  "watermelon",
+  "pineapple",
+  "coconut",
+  "avocado",
+  "chocolate",
+  "sugar",
+  "honey",
+  "tofu",
+  "quinoa",
 ];
 
 function escapeRegExp(s: string): string {
@@ -252,6 +281,12 @@ export function resolveIngredientToken(token: string): string {
 
 function normalizeIngredientKey(ing: string): string {
   if (ing === "eggs") return "egg";
+  if (ing === "strawberries") return "strawberry";
+  if (ing === "blueberries") return "blueberry";
+  if (ing === "raspberries") return "raspberry";
+  if (ing === "blackberries") return "blackberry";
+  if (ing === "cranberries") return "cranberry";
+  if (ing === "cherries") return "cherry";
   return ing;
 }
 
@@ -400,6 +435,10 @@ function extractRequiredIngredients(message: string): string[] {
     if (hintMatches.length === 1 && meaningful.length === 1) {
       return [normalizeIngredientKey(resolveIngredientToken(hintMatches[0]))];
     }
+    // Single ingredient word not in hint list (e.g. "rhubarb") — still filter by it.
+    if (meaningful.length === 1 && meaningful[0].length >= 4) {
+      return [normalizeIngredientKey(meaningful[0])];
+    }
   }
 
   return [];
@@ -425,6 +464,12 @@ function containsTerm(text: string, term: string): boolean {
   const t = term.toLowerCase();
   if (t === "egg" || t === "eggs") {
     return /\begg(s)?\b/i.test(text);
+  }
+  if (t === "strawberry") {
+    return /\bstrawberr(y|ies)\b/i.test(text);
+  }
+  if (t === "cherry") {
+    return /\bcherri(es|y)\b/i.test(text);
   }
   const pattern = new RegExp(`\\b${escapeRegExp(t)}(s|es)?\\b`, "i");
   return pattern.test(text);

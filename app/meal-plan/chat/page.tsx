@@ -52,7 +52,18 @@ function MealPlanChatContent() {
         const res = await fetch("/api/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: initialPrompt }),
+          body: JSON.stringify({
+            message: initialPrompt,
+            mealPlanContext: {
+              planName: params.get("planName")?.trim() || "Meal plan",
+              householdSize: params.get("householdSize")?.trim() || "not specified",
+              ingredients: params.get("ingredients")?.trim() || "",
+              dietaryRestrictions: params.get("dietaryRestrictions")?.trim() || "none",
+              allergies: params.get("allergies")?.trim() || "none",
+              proteinTarget: params.get("proteinTarget")?.trim() || "not specified",
+            },
+            dietaryPreferences: params.get("dietaryRestrictions")?.trim() || undefined,
+          }),
         });
         const data = (await res.json()) as { reply?: string };
         if (!mounted) return;
@@ -84,7 +95,22 @@ function MealPlanChatContent() {
       const res = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({
+          message: userText,
+          chatHistory: messages.slice(-8).map((m) => ({
+            role: m.role,
+            content: m.text,
+          })),
+          mealPlanContext: {
+            planName: params.get("planName")?.trim() || "Meal plan",
+            householdSize: params.get("householdSize")?.trim() || "not specified",
+            ingredients: params.get("ingredients")?.trim() || "",
+            dietaryRestrictions: params.get("dietaryRestrictions")?.trim() || "none",
+            allergies: params.get("allergies")?.trim() || "none",
+            proteinTarget: params.get("proteinTarget")?.trim() || "not specified",
+          },
+          dietaryPreferences: params.get("dietaryRestrictions")?.trim() || undefined,
+        }),
       });
       const data = (await res.json()) as { reply?: string };
       setMessages((prev) => [

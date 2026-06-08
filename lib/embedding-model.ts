@@ -42,9 +42,9 @@ const HUGGINGFACE_MODELS = [
 
 const EMBEDDING_CACHE_TTL_MS = 5 * 60 * 1000;
 const EMBEDDING_CACHE_MAX_ITEMS = 300;
-const HF_TIMEOUT_MS = 3500;
-/** First local inference loads ~90MB weights; cold start can exceed 8s on Windows. */
-const PYTHON_TIMEOUT_MS = 45_000;
+const HF_TIMEOUT_MS = Number(process.env.EMBEDDING_HF_TIMEOUT_MS) || 6_000;
+/** Local subprocess reloads weights each spawn; keep short and fall back to HF API. */
+const PYTHON_TIMEOUT_MS = Number(process.env.EMBEDDING_LOCAL_TIMEOUT_MS) || 12_000;
 
 const embeddingCache = new Map<string, { value: number[]; expiresAt: number }>();
 const inFlightEmbeddings = new Map<string, Promise<number[]>>();
@@ -268,22 +268,50 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
 
   const run = (async () => {
-  // Try local model first (for development)
-    if (isModelAvailable()) {
+    const preferLocal = process.env.EMBEDDING_PREFER_LOCAL === "true";
+
+    const tryHf = async () => {
+      const embedding = await generateEmbeddingWithHuggingFace(text);
+      setCachedEmbedding(cacheKey, embedding);
+      return embedding;
+    };
+
+    const tryLocal = async () => {
+      if (!isModelAvailable()) {
+        throw new Error("Local embedding model not available");
+      }
+      const embedding = await generateEmbeddingLocal(text);
+      setCachedEmbedding(cacheKey, embedding);
+      return embedding;
+    };
+
+    // HF API is ~1–3s; spawning Python reloads ~90MB weights each request (~30–40s on Windows).
+    if (!preferLocal) {
       try {
-        const embedding = await generateEmbeddingLocal(text);
-        setCachedEmbedding(cacheKey, embedding);
-        return embedding;
+        return await tryHf();
       } catch (error: any) {
         if (process.env.NODE_ENV === "development") {
-          console.warn("[embedding] Local model failed, using HF API:", error.message);
+          console.warn("[embedding] HF API failed, trying local model:", error.message);
         }
+      }
+      try {
+        return await tryLocal();
+      } catch (error: any) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[embedding] Local model failed:", error.message);
+        }
+        throw error;
       }
     }
 
-    const embedding = await generateEmbeddingWithHuggingFace(text);
-    setCachedEmbedding(cacheKey, embedding);
-    return embedding;
+    try {
+      return await tryLocal();
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[embedding] Local model failed, using HF API:", error.message);
+      }
+      return tryHf();
+    }
   })();
 
   inFlightEmbeddings.set(cacheKey, run);

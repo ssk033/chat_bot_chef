@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { invokeChefCursorFallback } from "@/lib/chef-fallback";
+import { assessRetrievalConfidence, isGeneralCookingKnowledgeQuestion } from "@/lib/chef-retrieval-confidence";
+import { loadChefSessionContext, normalizeClientHistory } from "@/lib/chef-session-context";
+import { getAnonymousKeyFromRequest } from "@/lib/chef-auth";
 import { formatRecipesJsonReply } from "@/lib/format-recipe-response";
 import { generateEmbedding } from "@/lib/embedding-model";
 import { prisma, withPrismaReconnect } from "@/lib/prisma";
@@ -12,8 +16,8 @@ import {
   resolveIngredientToken,
   validateRecipeConstraints,
   type QueryConstraints,
+  type RankedRecipe,
 } from "@/lib/query-constraints";
-import { RECIPE_CHEF_JSON_INSTRUCTION } from "@/lib/recipe-chef-prompt";
 
 export const runtime = "nodejs";
 
@@ -24,47 +28,11 @@ function queryLog(...args: unknown[]) {
   if (isQueryDebug) console.log(...args);
 }
 
-/**
- * Format instructions - handle JSON arrays or plain text
- */
-function formatInstructions(instructions: string | null | undefined): string {
-  if (!instructions) return "Not specified";
-  
-  try {
-    // Try to parse as JSON array
-    const parsed = JSON.parse(instructions);
-    if (Array.isArray(parsed)) {
-      return parsed.map((step: string, index: number) => `${index + 1}. ${step}`).join('\n');
-    }
-  } catch {
-    // Not JSON, treat as plain text
-  }
-  
-  // If it's plain text, return as is (but clean up if needed)
-  return instructions;
-}
-
 const CASUAL_CHAT_REGEX =
   /^(hi|hello|hey|yo|sup|how are you|what's up|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)$/i;
 
 function isCasualConversation(message: string): boolean {
   return CASUAL_CHAT_REGEX.test(message.trim());
-}
-
-function formatNoMatchReply(constraints: QueryConstraints): string {
-  if (constraints.requiredIngredients.length === 1) {
-    return formatRecipesJsonReply(
-      `No recipes found containing ${constraints.requiredIngredients[0]}.`,
-      []
-    );
-  }
-  if (constraints.requiredIngredients.length > 1) {
-    return formatRecipesJsonReply(
-      `No recipes found containing all of: ${constraints.requiredIngredients.join(", ")}.`,
-      []
-    );
-  }
-  return formatRecipesJsonReply("No recipes matched your requirements.", []);
 }
 
 function mergeMealPlanConstraints(
@@ -84,7 +52,7 @@ function applyConstraintPipeline(
   message: string,
   constraints: QueryConstraints,
   candidates: any[]
-): any[] {
+): { results: any[]; ranked: RankedRecipe[] } {
   const rejected = candidates
     .map((r) => ({
       title: String(r.title ?? "Untitled"),
@@ -114,7 +82,139 @@ function applyConstraintPipeline(
     finalResults: validated.map((r) => ({ title: String(r.title ?? "Untitled") })),
   });
 
-  return validated.slice(0, 5);
+  return { results: validated.slice(0, 5), ranked };
+}
+
+type QueryRequestBody = {
+  message?: string;
+  sessionId?: number;
+  chatHistory?: { role: string; content: string }[];
+  dietaryPreferences?: string;
+  mealPlanContext?: Record<string, string>;
+};
+
+async function resolveChefReplyWithFallback(args: {
+  message: string;
+  constraints: QueryConstraints;
+  uniqueResults: any[];
+  rankedResults: RankedRecipe[];
+  recipeCount: number;
+  sessionContext: Awaited<ReturnType<typeof loadChefSessionContext>>;
+  mealPlanContext?: Record<string, string>;
+  requestedCount: number | null;
+  assessmentReasons: string[];
+  forceCursor?: boolean;
+}): Promise<{ reply: string; source: "database" | "cursor" | "static" }> {
+  const assessment = assessRetrievalConfidence({
+    message: args.message,
+    constraints: args.constraints,
+    rankedResults: args.rankedResults,
+    uniqueCount: args.uniqueResults.length,
+  });
+
+  const reasons = [...new Set([...args.assessmentReasons, ...assessment.reasons])];
+  const useCursor = args.forceCursor || assessment.useCursorFallback;
+
+  if (!useCursor && args.uniqueResults.length > 0) {
+    const reply = generateIntelligentFallbackResponse(
+      args.message,
+      args.uniqueResults,
+      args.requestedCount
+    );
+    return { reply, source: "database" };
+  }
+
+  queryLog("🧠 Cursor Chef fallback", reasons.join(", ") || "triggered");
+
+  const cursorOutcome = await invokeChefCursorFallback({
+    userQuery: args.message,
+    chatHistory: args.sessionContext.history,
+    dietaryPreferences: args.sessionContext.dietaryPreferences,
+    sessionTitle: args.sessionContext.sessionTitle,
+    mealPlanContext: args.mealPlanContext,
+    constraints: args.constraints,
+    retrievedRecipes: args.uniqueResults.map((r) => ({
+      title: String(r.title ?? "Untitled"),
+      ingredients: r.ingredients,
+      instructions: r.instructions,
+      prepTime: r.prepTime,
+      cookTime: r.cookTime,
+      cuisine: r.cuisine,
+      yield: r.yield,
+      distance: r.distance,
+      finalScore: r.finalScore,
+    })),
+    fallbackReasons: reasons,
+    databaseRecipeCount: args.recipeCount,
+  });
+
+  return {
+    reply: cursorOutcome.reply,
+    source: cursorOutcome.cursorUsed ? "cursor" : "static",
+  };
+}
+
+function dedupeRecipesById(recipes: any[]): any[] {
+  const seen = new Set<string | number>();
+  return recipes.filter((r) => {
+    const id = r.id;
+    if (id == null) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function shouldPreferTextSearch(message: string, constraints: QueryConstraints): boolean {
+  if (constraints.requiredIngredients.length > 0) return true;
+  if (/ingredients\s*\/?\s*pantry\s*on\s*hand\s*:/i.test(message)) return true;
+  const terms = getSearchTermsForRanking(constraints, message);
+  if (terms.length === 0) return false;
+  return !message.includes("\n") && message.trim().length <= 220;
+}
+
+async function searchRecipesByText(message: string, constraints: QueryConstraints): Promise<any[]> {
+  const searchTerms =
+    constraints.requiredIngredients.length > 0
+      ? constraints.requiredIngredients
+      : getSearchTermsForRanking(constraints, message);
+
+  const prepTimeMatch = message.match(/(\d+)\s*(?:min|minute|mins)\s*(?:prep|preparation)/i);
+  const maxPrepTime = prepTimeMatch ? parseInt(prepTimeMatch[1], 10) : null;
+
+  if (searchTerms.length === 0) {
+    const sample = await withPrismaReconnect(() =>
+      prisma.recipe.findMany({ take: 5, orderBy: { id: "asc" } })
+    );
+    return sample.map((r) => ({ ...r, distance: 0.5 }));
+  }
+
+  const whereClause: any = {
+    OR: [
+      ...searchTerms.map((term: string) => ({
+        ingredients: { contains: term, mode: "insensitive" as const },
+      })),
+      ...searchTerms.map((term: string) => ({
+        title: { contains: term, mode: "insensitive" as const },
+      })),
+      ...searchTerms.map((term: string) => ({
+        instructions: { contains: term, mode: "insensitive" as const },
+      })),
+    ],
+  };
+
+  if (maxPrepTime !== null) {
+    whereClause.prepTime = { lte: maxPrepTime };
+  }
+
+  const textResults = await withPrismaReconnect(() =>
+    prisma.recipe.findMany({
+      where: whereClause,
+      take: 25,
+    })
+  );
+
+  return textResults.map((r) => ({ ...r, distance: 0.35 }));
 }
 
 /**
@@ -167,11 +267,26 @@ function generateIntelligentFallbackResponse(
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json();
+    const body = (await req.json()) as QueryRequestBody;
+    const message = body.message?.trim();
 
     if (!message) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
+
+    const anonymousKey = getAnonymousKeyFromRequest(req);
+    const sessionId =
+      typeof body.sessionId === "number" && Number.isFinite(body.sessionId)
+        ? body.sessionId
+        : undefined;
+    const clientHistory = normalizeClientHistory(body.chatHistory);
+    const sessionContext = await loadChefSessionContext({
+      sessionId,
+      anonymousKey,
+      clientHistory,
+      dietaryPreferences: body.dietaryPreferences,
+    });
+    const mealPlanContext = body.mealPlanContext;
 
     // Handle model status check
     if (message === '__check_model__') {
@@ -202,12 +317,22 @@ export async function POST(req: Request) {
 
     queryLog("📝 User query:", message);
 
-    // Check if database has recipes (single lightweight query on hot path)
     const recipeCount = await withPrismaReconnect(() => prisma.recipe.count());
     if (recipeCount === 0) {
-      return NextResponse.json({
-        reply: "I don't have any recipes in my database yet. Please run the load script to import recipes first:\n\n```bash\nnpm run load\n```\n\nOr if you're using the TypeScript script:\n```bash\nnpx ts-node scripts/load.ts\n```"
+      queryLog("📭 Empty recipe database — using Cursor Chef");
+      const { reply, source } = await resolveChefReplyWithFallback({
+        message,
+        constraints: parseQueryConstraints(message),
+        uniqueResults: [],
+        rankedResults: [],
+        recipeCount: 0,
+        sessionContext,
+        mealPlanContext,
+        requestedCount: null,
+        assessmentReasons: ["empty_database"],
+        forceCursor: true,
       });
+      return NextResponse.json({ reply, source });
     }
 
     const mealPlanMatch = message.match(/generate a meal plan with ingredients:\s*([^\.]+)/i);
@@ -219,125 +344,72 @@ export async function POST(req: Request) {
       : [];
 
     const constraints = mergeMealPlanConstraints(parseQueryConstraints(message), mealPlanIngredients);
+    const preferTextSearch =
+      mealPlanIngredients.length > 0 || shouldPreferTextSearch(message, constraints);
 
-    // 1️⃣ Try to create embedding for user query (optional - will use text search if fails)
-    queryLog("🔄 Attempting to generate embedding for query...");
-    let qEmbedding: number[] | null = null;
-    let qLiteral: string | null = null;
-    let useVectorSearch = false;
-    
-    if (mealPlanIngredients.length === 0) {
-      try {
-        qEmbedding = await generateEmbedding(message);
-        qLiteral = `[${qEmbedding.join(",")}]`;
-        useVectorSearch = true;
-        queryLog("✅ Embedding generated successfully (dimension:", qEmbedding.length, ")");
-      } catch (embedError: any) {
-        console.warn("⚠️ Embedding generation failed, will use text search instead:", embedError.message);
-        // Don't return error - continue with text search fallback
-        useVectorSearch = false;
-      }
-    } else {
-      queryLog("🍽️ Meal-plan request detected, using ingredient-priority search");
-      useVectorSearch = false;
-    }
-
-    // 2️⃣ Search for recipes - try vector search first, fallback to text search
-    queryLog("🔍 Searching for similar recipes...");
+    queryLog("🔍 Searching for recipes...", preferTextSearch ? "(text-first)" : "(vector)");
     let results: any[] = [];
-    
-    if (useVectorSearch && qLiteral) {
-      try {
-        // Escape the literal to prevent SQL injection (though it's already a number array)
-        const sanitizedLiteral = qLiteral.replace(/'/g, "''");
-        results = await withPrismaReconnect(() => prisma.$queryRawUnsafe(`
+
+    try {
+      if (preferTextSearch) {
+        results = await searchRecipesByText(message, constraints);
+        queryLog("✅ Found", results.length, "recipes using text search");
+      } else {
+        let qLiteral: string | null = null;
+        try {
+          const qEmbedding = await generateEmbedding(message);
+          qLiteral = `[${qEmbedding.join(",")}]`;
+          queryLog("✅ Embedding generated (dimension:", qEmbedding.length, ")");
+        } catch (embedError: any) {
+          console.warn("⚠️ Embedding failed, using text search:", embedError.message);
+        }
+
+        if (qLiteral) {
+          try {
+            const sanitizedLiteral = qLiteral.replace(/'/g, "''");
+            results = (await withPrismaReconnect(() =>
+              prisma.$queryRawUnsafe(`
           SELECT r.*, e.vector <-> '${sanitizedLiteral}'::vector AS distance
           FROM "embeddings" e
           JOIN "Recipe" r ON e."recipeId" = r.id
           ORDER BY e.vector <-> '${sanitizedLiteral}'::vector
           LIMIT 25;
-        `)) as any[];
-        queryLog("✅ Found", results.length, "recipes using vector search");
-      } catch (searchError: any) {
-        console.warn("⚠️ Vector search failed, falling back to text search:", searchError.message);
-        useVectorSearch = false; // Fall through to text search
-      }
-    }
-    
-    // If vector search didn't work or wasn't attempted, use text search
-    if (!useVectorSearch || results.length === 0) {
-      queryLog("🔄 Using text-based search...");
-      try {
-        // Extract meaningful search terms from query
-        const searchTerms =
-          constraints.requiredIngredients.length > 0
-            ? constraints.requiredIngredients
-            : getSearchTermsForRanking(constraints, message);
-        
-        // Extract prep time filter if mentioned
-        const prepTimeMatch = message.match(/(\d+)\s*(?:min|minute|mins)\s*(?:prep|preparation)/i);
-        const maxPrepTime = prepTimeMatch ? parseInt(prepTimeMatch[1], 10) : null;
-        
-        if (searchTerms.length > 0) {
-          // Build search query - prioritize ingredients, then title
-          const whereClause: any = {
-            OR: [
-              // First priority: ingredients (most important for ingredient-based queries)
-              ...searchTerms.map((term: string) => ({
-                ingredients: { contains: term, mode: 'insensitive' as const }
-              })),
-              // Second priority: title
-              ...searchTerms.map((term: string) => ({
-                title: { contains: term, mode: 'insensitive' as const }
-              })),
-              // Third priority: instructions
-              ...searchTerms.map((term: string) => ({
-                instructions: { contains: term, mode: 'insensitive' as const }
-              }))
-            ]
-          };
-          
-          // Add prep time filter if specified
-          if (maxPrepTime !== null) {
-            whereClause.prepTime = { lte: maxPrepTime };
+        `)
+            )) as any[];
+            queryLog("✅ Found", results.length, "recipes using vector search");
+          } catch (searchError: any) {
+            console.warn("⚠️ Vector search failed, falling back to text search:", searchError.message);
           }
-          
-          const textResults = await withPrismaReconnect(() => prisma.recipe.findMany({
-            where: whereClause,
-            take: 10, // Get more results to filter better
-          }));
-          
-          // Filter and sort results by relevance
-          results = textResults.map((r: any) => ({
-            ...r,
-            distance: 0.5,
-          }));
-          
-          queryLog("✅ Found", results.length, "recipes using text search");
-        } else {
-          // If no search terms, get random recipes
-          results = await withPrismaReconnect(() => prisma.recipe.findMany({
-            take: 5,
-            orderBy: { id: 'asc' }
-          }));
-          results = results.map((r: any) => ({ ...r, distance: 0.5 }));
-          queryLog("✅ No specific search terms, returning sample recipes");
         }
-      } catch (fallbackError: any) {
-        console.error("❌ Text search also failed:", fallbackError);
-        return NextResponse.json({
-          reply: "I encountered an error searching for recipes. The database might not be properly configured. Please check:\n1. Database connection is working\n2. Recipes are loaded"
-        }, { status: 500 });
+
+        if (results.length === 0) {
+          results = await searchRecipesByText(message, constraints);
+          queryLog("✅ Found", results.length, "recipes using text search fallback");
+        }
       }
+    } catch (searchError: any) {
+      console.error("❌ Recipe search failed:", searchError);
+      return NextResponse.json(
+        {
+          reply:
+            "I encountered an error searching for recipes. The database might not be properly configured. Please check:\n1. Database connection is working\n2. Recipes are loaded",
+        },
+        { status: 500 }
+      );
     }
+
+    results = dedupeRecipesById(results);
 
     const hasActiveConstraints =
       constraints.dietary.length > 0 ||
       constraints.requiredIngredients.length > 0 ||
       constraints.excludedIngredients.length > 0;
 
+    let rankedResults: RankedRecipe[] = [];
     if (results.length > 0) {
-      results = applyConstraintPipeline(message, constraints, results);
+      const piped = applyConstraintPipeline(message, constraints, results);
+      results = piped.results;
+      rankedResults = piped.ranked;
     }
 
     queryLog("✅ Found", results.length, "matching recipes after constraints");
@@ -349,38 +421,24 @@ export async function POST(req: Request) {
       (message.trim().length < 10 && !message.toLowerCase().match(/\b(recipe|ingredient|food|dish|cook|bake|make|prepare|cuisine|meal|breakfast|lunch|dinner|snack|dessert|appetizer|chicken|beef|pork|fish|vegetable|pasta|rice|bread|soup|salad|pizza|burger|sandwich|cake|cookie|pie|sauce|spice|herb|flavor|taste|kitchen|cooking|baking|grill|fry|boil|steam|roast)\b/i))
     );
 
-    // If it's a general question, skip recipe search and go directly to LLM
-    if (isGeneralQuestion && results.length === 0) {
-      queryLog("💬 Detected general question, skipping recipe search");
-      
-      // Fallback response for general questions (works without Ollama)
+    if (isGeneralQuestion && results.length === 0 && !isGeneralCookingKnowledgeQuestion(message)) {
+      queryLog("💬 Casual greeting");
       const greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!"];
       const responses: { [key: string]: string } = {
-        "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
-        "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
-        "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
-        "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
-        "thank you": "You're very welcome! Happy cooking!",
-        "bye": "Goodbye! Happy cooking!",
-        "goodbye": "See you later! Enjoy your cooking!",
-        "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
+        hi: "Hello! I'm Chef — ask for a dish, ingredients you have, or nutrition tips.",
+        hello: "Hi! Tell me what you'd like to cook or what's in your pantry.",
+        "how are you": "Doing great and ready to cook with you. What should we make?",
+        thanks: "Anytime! Want another recipe or meal idea?",
+        "thank you": "You're welcome. Happy cooking!",
+        bye: "Bye! Come back when you're hungry.",
+        goodbye: "See you soon!",
+        help: "I can find recipes, plan meals, estimate nutrition, and suggest dishes from your ingredients.",
       };
-      
       const lowerMessage = message.toLowerCase().trim();
-      const reply = responses[lowerMessage] || greetings[Math.floor(Math.random() * greetings.length)] + " I'm your AI chef assistant. How can I help you with recipes?";
-      
-      return NextResponse.json({ reply });
-    }
-
-    if (results.length === 0) {
-      if (hasActiveConstraints) {
-        return NextResponse.json({
-          reply: formatNoMatchReply(constraints),
-        });
-      }
-      return NextResponse.json({
-        reply: `I couldn't find any recipes matching "${message}". Try:\n- Being more specific (e.g., "chicken pasta" instead of "food")\n- Using ingredient names (e.g., "tomatoes", "pasta", "chicken")\n- Asking for recipe types (e.g., "dessert", "breakfast", "italian")`
-      });
+      const reply =
+        responses[lowerMessage] ||
+        `${greetings[Math.floor(Math.random() * greetings.length)]} I'm Chef — what would you like to make?`;
+      return NextResponse.json({ reply, source: "static" });
     }
 
     // Extract number from query for AI prompt
@@ -400,95 +458,35 @@ export async function POST(req: Request) {
       return true;
     });
     
-    // Limit results for AI context
-    const limitForAI = requestedCount && requestedCount > 0 ? Math.min(requestedCount, uniqueResults.length) : Math.min(3, uniqueResults.length);
+    const extraReasons: string[] = [];
     if (uniqueResults.length === 0 && hasActiveConstraints) {
-      return NextResponse.json({
-        reply: formatNoMatchReply(constraints),
-      });
+      extraReasons.push("constraint_no_match");
     }
 
-    const aiResults = uniqueResults.slice(0, limitForAI);
-    
-    // Build context for LLM enhancement (each recipe stays separate in source data)
-    let context = `${RECIPE_CHEF_JSON_INSTRUCTION}\n\nRetrieved recipes (use one JSON object per recipe in your output):\n`;
-    for (const r of aiResults) {
-      const formattedInstructions = formatInstructions(r.instructions);
-      context += `
-Recipe: ${r.title}
-Ingredients: ${r.ingredients || "Not specified"}
-Instructions: ${formattedInstructions.slice(0, 400)}${formattedInstructions.length > 400 ? "..." : ""}
-Prep Time: ${r.prepTime || "Not specified"} minutes
-Cook Time: ${r.cookTime || "Not specified"} minutes
-Total Time: ${r.totalTime || "Not specified"} minutes
-Cuisine: ${r.cuisine || "Not specified"}
-Servings: ${r.yield || "Not specified"}
----
-`;
-    }
+    queryLog("🤖 Resolving Chef response (database → confidence → Cursor)...");
+    const { reply, source } = await resolveChefReplyWithFallback({
+      message,
+      constraints,
+      uniqueResults,
+      rankedResults,
+      recipeCount,
+      sessionContext,
+      mealPlanContext,
+      requestedCount,
+      assessmentReasons: extraReasons,
+      forceCursor: uniqueResults.length === 0,
+    });
 
-    // 3️⃣ Generate response from retrieved recipes
-    void context;
-    queryLog("🤖 Generating recipe response...");
-    let reply: string;
-    
-    try {
-      reply = generateIntelligentFallbackResponse(message, uniqueResults, requestedCount);
-      queryLog("✅ Generated intelligent recipe response");
-    } catch {
-      queryLog("⚠️ Primary recipe response failed, using basic listing fallback...");
-      // Final fallback: Return recipes directly without AI enhancement
-      queryLog("⚠️ Using basic recipe listing fallback...");
-      
-      // Check if it's a general question for fallback
-      const isGeneralQuestionFallback = /^(hi|hello|hey|how are you|what's up|how do you do|good morning|good afternoon|good evening|thanks|thank you|bye|goodbye|who are you|what are you|help|help me)/i.test(message.trim());
-    
-      if (isGeneralQuestionFallback) {
-        const responses: { [key: string]: string } = {
-          "hi": "Hello! I'm your AI chef assistant. How can I help you with recipes today?",
-          "hello": "Hi! I'm here to help you find recipes and answer cooking questions. What would you like to know?",
-          "how are you": "I'm doing great, thank you for asking! I'm ready to help you with recipes and cooking tips. What can I help you with?",
-          "thanks": "You're welcome! Feel free to ask if you need any more recipe suggestions.",
-          "thank you": "You're very welcome! Happy cooking!",
-          "bye": "Goodbye! Happy cooking!",
-          "goodbye": "See you later! Enjoy your cooking!",
-          "help": "I'm your AI chef assistant! I can help you:\n- Find recipes by ingredients\n- Suggest dishes based on what you have\n- Answer cooking questions\n\nJust ask me anything about recipes or cooking!"
-        };
-        
-        const lowerMessage = message.toLowerCase().trim();
-        reply = responses[lowerMessage] || "Hello! I'm your AI chef assistant. How can I help you with recipes?";
-        
-        return NextResponse.json({ reply });
-      }
-    
-      // Use the already-declared requestedCount and uniqueResults from outer scope
-      // No need to redeclare them
-    
-      // Limit to requested number or default to 3
-      const limit = requestedCount && requestedCount > 0 ? requestedCount : 3;
-      const finalResults = uniqueResults.slice(0, limit);
-      
-      const intro = `I found ${finalResults.length} recipe${finalResults.length > 1 ? "s" : ""} matching your query:`;
-      reply = formatRecipesJsonReply(intro, finalResults);
-      
-      return NextResponse.json({
-        reply,
-        sources: finalResults.map((r: any) => ({
-          title: r.title,
-          prepTime: r.prepTime,
-          cookTime: r.cookTime,
-          distance: r.distance
-        })),
-      });
-    }
+    queryLog("✅ Chef response via", source);
 
     return NextResponse.json({
       reply,
-      sources: results.map((r: any) => ({
+      source,
+      sources: uniqueResults.map((r: any) => ({
         title: r.title,
         prepTime: r.prepTime,
         cookTime: r.cookTime,
-        distance: r.distance
+        distance: r.distance,
       })),
     });
   } catch (error: any) {
