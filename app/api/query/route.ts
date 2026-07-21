@@ -18,6 +18,10 @@ import {
   type QueryConstraints,
   type RankedRecipe,
 } from "@/lib/query-constraints";
+import {
+  httpRequestCounter,
+  requestDuration,
+} from "@/lib/prometheus";
 
 export const runtime = "nodejs";
 
@@ -266,6 +270,10 @@ function generateIntelligentFallbackResponse(
 }
 
 export async function POST(req: Request) {
+  const end = requestDuration.startTimer({
+    method: "POST",
+    route: "/api/query",
+  });
   try {
     const body = (await req.json()) as QueryRequestBody;
     const message = body.message?.trim();
@@ -291,6 +299,11 @@ export async function POST(req: Request) {
     // Handle model status check
     if (message === '__check_model__') {
       const { isModelAvailable } = await import('@/lib/embedding-model');
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "200",
+      });
       return NextResponse.json({ 
         modelAvailable: isModelAvailable(),
         reply: isModelAvailable() ? "Model ready" : "Model not found"
@@ -312,6 +325,11 @@ export async function POST(req: Request) {
         "help": "I can help with:\n- dish-based recipes (e.g. mutton biryani)\n- ingredient-based recipes (e.g. rice onion tomato)\n- quick meal ideas by prep time",
       };
       const key = message.toLowerCase().trim();
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "200",
+      });
       return NextResponse.json({ reply: responses[key] ?? "Hey! Tell me what dish you want and I will find recipes for it." });
     }
 
@@ -331,6 +349,11 @@ export async function POST(req: Request) {
         requestedCount: null,
         assessmentReasons: ["empty_database"],
         forceCursor: true,
+      });
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "200",
       });
       return NextResponse.json({ reply, source });
     }
@@ -438,6 +461,11 @@ export async function POST(req: Request) {
       const reply =
         responses[lowerMessage] ||
         `${greetings[Math.floor(Math.random() * greetings.length)]} I'm Chef — what would you like to make?`;
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "200",
+      });
       return NextResponse.json({ reply, source: "static" });
     }
 
@@ -479,6 +507,11 @@ export async function POST(req: Request) {
 
     queryLog("✅ Chef response via", source);
 
+    httpRequestCounter.inc({
+      method: "POST",
+      route: "/api/query",
+      status: "200",
+    });
     return NextResponse.json({
       reply,
       source,
@@ -504,6 +537,11 @@ export async function POST(req: Request) {
         errorMessage.includes("Connection") ||
         errorMessage.includes("ECONNREFUSED") ||
         errorMessage.includes("P1001")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: "⚠️ Database connection error. Please check your DATABASE_URL environment variable and ensure your database is accessible."
       }, { status: 500 });
@@ -514,6 +552,11 @@ export async function POST(req: Request) {
         errorMessage.includes("does not exist") ||
         errorMessage.includes("P2021") ||
         errorMessage.includes("P2001")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: "⚠️ Database tables not found. Please run database migrations:\n\n```bash\nnpx prisma migrate deploy\n```\n\nOr if developing locally:\n```bash\nnpx prisma migrate dev\n```"
       }, { status: 500 });
@@ -523,6 +566,11 @@ export async function POST(req: Request) {
     if (errorMessage.includes("vector") || 
         errorMessage.includes("pgvector") ||
         errorMessage.includes("operator does not exist")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: "⚠️ Vector extension error. Please ensure pgvector extension is enabled in your PostgreSQL database:\n\n```sql\nCREATE EXTENSION IF NOT EXISTS vector;\n```"
       }, { status: 500 });
@@ -533,6 +581,11 @@ export async function POST(req: Request) {
         errorMessage.includes("trained model not found") ||
         errorMessage.includes("inference.py") ||
         errorMessage.includes("Python")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: "⚠️ Embedding model not available. The trained model files are required for generating embeddings. Please ensure the model is properly set up."
       }, { status: 500 });
@@ -543,6 +596,11 @@ export async function POST(req: Request) {
         errorMessage.includes("429") ||
         errorMessage.includes("rate limit") ||
         errorMessage.includes("Resource exhausted")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: "⚠️ Rate limit reached. Please wait a moment and try again."
       }, { status: 429 });
@@ -550,12 +608,22 @@ export async function POST(req: Request) {
     
     // Prisma errors
     if (errorName.includes("Prisma") || errorMessage.includes("P")) {
+      httpRequestCounter.inc({
+        method: "POST",
+        route: "/api/query",
+        status: "500",
+      });
       return NextResponse.json({
         reply: `⚠️ Database error: ${errorMessage}. Please check your database connection and schema.`
       }, { status: 500 });
     }
     
     // Generic error with more context
+    httpRequestCounter.inc({
+      method: "POST",
+      route: "/api/query",
+      status: "500",
+    });
     return NextResponse.json(
       { 
         error: errorMessage,
@@ -563,5 +631,7 @@ export async function POST(req: Request) {
       },
       { status: 500 }
     );
+  } finally {
+    end();
   }
 }
