@@ -1,0 +1,42 @@
+# Dependencies & build output
+node_modules
+.next
+out
+dist
+coverage
+
+# Git & IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+
+# Logs & local env (runtime env via docker-compose env_file)
+*.log
+logs
+.env
+.env.local
+.env.*.local
+
+# Python / ML (not required for Next.js production image)
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.venv
+venv
+.venv-food-ai
+ml-models
+RecipeModel
+Food-Recognition-and-Calorie-Estimation
+
+# OS & misc
+.DS_Store
+Thumbs.db
+*.md
+!docker/README.md
+
+# Agent / local tooling
+terminals
+agent-tools
+agent-transcripts

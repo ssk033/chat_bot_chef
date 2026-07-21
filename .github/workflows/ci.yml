@@ -1,0 +1,56 @@
+name: Meal-IT CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+
+        env:
+          POSTGRES_USER: mealit
+          POSTGRES_PASSWORD: mealit123
+          POSTGRES_DB: mealit
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd="pg_isready -U mealit"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://mealit:mealit123@localhost:5432/mealit?schema=public
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npx prisma migrate deploy
+
+      - run: npm run build
+
+      - run: docker build -t meal-it .

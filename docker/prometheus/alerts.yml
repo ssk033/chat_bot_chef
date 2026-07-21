@@ -1,0 +1,14 @@
+groups:
+  - name: meal-it-alerts
+
+    rules:
+      - alert: NoRequestsReceived
+        expr: increase(http_requests_total[2m]) < 1
+        for: 2m
+
+        labels:
+          severity: warning
+
+        annotations:
+          summary: "No HTTP Requests"
+          description: "No HTTP requests received in the last 2 minutes."
