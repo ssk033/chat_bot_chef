@@ -1,11 +1,18 @@
-name: Meal-IT CI
+name: Meal-IT CI/CD Pipeline
 
 on:
   push:
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  test-build:
+  build-and-push:
+    name: Build & Push Docker Image to GHCR
     runs-on: ubuntu-latest
 
     services:
@@ -27,74 +34,137 @@ jobs:
       DATABASE_URL: postgresql://mealit:mealit123@localhost:5432/mealit?schema=public
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
-      - run: npx prisma generate
-      - run: npx prisma migrate deploy
-      - run: npm run build
-      - run: docker build -t meal-it .
+      - name: Install Dependencies
+        run: npm ci
 
-  deploy-local:
-    needs: test-build
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Database Migrations (Test DB)
+        run: npx prisma migrate deploy
+
+      - name: Build Next.js Application
+        run: npm run build
+
+      - name: Downcase Repository Name for GHCR Compatibility
+        run: |
+          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/meal-it-app"
+          echo "IMAGE_NAME=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=short,prefix=
+            type=raw,value=latest
+            type=ref,event=branch
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Self-Hosted Runner
+    needs: build-and-push
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Create .env
+      - name: Log in to GHCR on Self-Hosted Runner
         shell: powershell
         run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Downcase Image Name for Compose
+        shell: powershell
+        run: |
+          $owner = "${{ github.repository_owner }}".ToLower()
+          Add-Content -Path $env:GITHUB_ENV -Value "IMAGE_NAME=ghcr.io/$owner/meal-it-app"
+          Add-Content -Path $env:GITHUB_ENV -Value "IMAGE_TAG=latest"
+
+      - name: Generate Production .env from GitHub Secrets
+        shell: powershell
+        run: |
+          $owner = "${{ github.repository_owner }}".ToLower()
           @"
-          POSTGRES_USER=mealit
-          POSTGRES_PASSWORD=mealit123
-          POSTGRES_DB=mealit
-          DATABASE_URL=postgresql://mealit:mealit123@postgres:5432/mealit?schema=public
-          OLLAMA_BASE_URL=http://your-ollama-service.com:11434
-          OLLAMA_MODEL=llama3.2:1b
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.POSTGRES_DB }}?schema=public
+          OLLAMA_BASE_URL=${{ secrets.OLLAMA_BASE_URL }}
+          OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
           GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           CURSOR_API_KEY=${{ secrets.CURSOR_API_KEY }}
+          IMAGE_NAME=ghcr.io/$owner/meal-it-app
+          IMAGE_TAG=latest
           "@ | Out-File -FilePath "$env:GITHUB_WORKSPACE\.env" -Encoding ascii
 
-      - name: Debug Workspace
-        shell: powershell
-        run: |
-          Write-Host "Workspace: $env:GITHUB_WORKSPACE"
-          cd $env:GITHUB_WORKSPACE
-          Get-Location
-          dir -Force
-
-      - name: Check .env
+      - name: Verify Workspace .env
         shell: powershell
         run: |
           cd $env:GITHUB_WORKSPACE
           if (Test-Path ".env") {
-            Write-Host "========== .env FOUND =========="
-            Get-Content .env
+            Write-Host "========== .env Successfully Generated =========="
           } else {
-            Write-Host "========== .env NOT FOUND =========="
+            Write-Error ".env generation failed!"
             exit 1
           }
 
-      - name: Stop old containers
+      - name: Pull Latest Docker Images from GHCR
         shell: powershell
         run: |
           cd $env:GITHUB_WORKSPACE
-          docker compose down
+          docker compose pull
 
-      - name: Build and start latest containers
+      - name: Deploy Containers Idempotently
         shell: powershell
         run: |
           cd $env:GITHUB_WORKSPACE
-          docker compose up --build -d
+          docker compose up -d
 
-      - name: Verify deployment
+      - name: Verify Container Health & Status
         shell: powershell
         run: |
           cd $env:GITHUB_WORKSPACE
+          Write-Host "========== Container Status =========="
           docker ps
+          
+          Start-Sleep -Seconds 10
+          $appContainer = docker ps --filter "name=app" --format "{{.Status}}"
+          Write-Host "App Container Status: $appContainer"
+          if ($appContainer -notlike "*Up*") {
+            Write-Error "Deployment verification failed: App container is not in running state!"
+            exit 1
+          }
+          Write-Host "========== Deployment Successful =========="

@@ -21,9 +21,7 @@ services:
       - meal-it
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-ghcr.io/meal-it-app}:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -37,6 +35,12 @@ services:
       PORT: 3000
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - meal-it
 
