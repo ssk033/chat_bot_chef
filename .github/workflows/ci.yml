@@ -47,11 +47,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create .env
+        shell: powershell
+        run: |
+          @"
+          POSTGRES_USER=mealit
+          POSTGRES_PASSWORD=mealit123
+          POSTGRES_DB=mealit
+          DATABASE_URL=postgresql://mealit:mealit123@postgres:5432/mealit?schema=public
+          OLLAMA_BASE_URL=http://your-ollama-service.com:11434
+          OLLAMA_MODEL=llama3.2:1b
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          CURSOR_API_KEY=${{ secrets.CURSOR_API_KEY }}
+          "@ | Out-File -FilePath "$env:GITHUB_WORKSPACE\.env" -Encoding ascii
+
+      - name: Debug Workspace
+        shell: powershell
+        run: |
+          Write-Host "Workspace: $env:GITHUB_WORKSPACE"
+          cd $env:GITHUB_WORKSPACE
+          Get-Location
+          dir -Force
+
+      - name: Check .env
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          if (Test-Path ".env") {
+            Write-Host "========== .env FOUND =========="
+            Get-Content .env
+          } else {
+            Write-Host "========== .env NOT FOUND =========="
+            exit 1
+          }
+
       - name: Stop old containers
-        run: docker compose down
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          docker compose down
 
       - name: Build and start latest containers
-        run: docker compose up --build -d
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          docker compose up --build -d
 
       - name: Verify deployment
-        run: docker ps
+        shell: powershell
+        run: |
+          cd $env:GITHUB_WORKSPACE
+          docker ps
